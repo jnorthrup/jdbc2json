@@ -1,0 +1,17 @@
+target
+.classpath
+.project
+.settings
+.idea
+war
+*.iml
+*.ipr
+*.iws
+*~
+
+*.bak
+*.jar
+*.war
+*.class
+
+
