@@ -13,6 +13,7 @@ mvn assembly:assembly
 #if all builds well, this is the next step
 
 cd target
+
 java -jar  jmysql2json-0.0.1-SNAPSHOT-jar-with-dependencies.jar mysqlhost mysqlinstance  mysqluser mysqlpassword http://localhost:5984/couchdb
 
 # (5 paramters, no slash at end of url)
