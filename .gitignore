@@ -6,9 +6,10 @@ target
 war
 *.iml
 *.ipr
+*.ids
 *.iws
 *~
-
+*.json
 *.bak
 *.jar
 *.war
