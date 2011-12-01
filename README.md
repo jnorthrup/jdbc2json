@@ -8,6 +8,7 @@ ubuntu instructions:
 sudo apt-get install maven2 couchdb
 
 cd ./jmysqltojson
+
 mvn assembly:assembly
 
 #if all builds well, this is the next step
