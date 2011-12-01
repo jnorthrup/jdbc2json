@@ -70,7 +70,7 @@ public class ToJson {
                 }
 
 
-                String str = (pk==null)?Long.toHexString(++counter):resultSet.getString(pk);
+                String str = (pk==null)?Long.toHexString((++counter)|0x1000000000l).substring(1):resultSet.getString(pk);
                 rows.put((name).concat("_").concat(str), row);
                 valid = resultSet.next();
             }
