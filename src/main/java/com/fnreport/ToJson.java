@@ -4,10 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.sql.*;
 import java.text.MessageFormat;
 import java.util.*;
@@ -78,18 +76,16 @@ public class ToJson {
 
 
                 String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
-                String concat = name+("_")+(str);
+                String concat = name + ("_") + (str);
                 URL url = new URL(new StringBuilder().append(args[4]).append('/').append(concat).toString());
                 HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
-                httpCon.setDoOutput(true);
+                byte[] utf8s = gson.toJson(row).getBytes("UTF8");
+                httpCon.setFixedLengthStreamingMode(utf8s.length);
                 httpCon.setRequestMethod("PUT");
-                String s = gson.toJson(row);
-                httpCon.setFixedLengthStreamingMode(s.length());
-                gson.toJson(Arrays.asList(url,row),System.out);
-                httpCon.getOutputStream().write(s.getBytes(Charset.forName("UTF8")));
-                OutputStream outputStream = httpCon.getOutputStream();
-                outputStream.flush();
-                httpCon.getInputStream().read(BYTES);
+                httpCon.setDoOutput(true);
+                gson.toJson(Arrays.asList(url, row), System.out);
+                httpCon.getOutputStream().write(utf8s);
+                httpCon.getOutputStream().flush();
                 httpCon.disconnect();
 
                 valid = resultSet.next();
