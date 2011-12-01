@@ -3,8 +3,11 @@ package com.fnreport;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.sql.*;
 import java.text.MessageFormat;
 import java.util.*;
@@ -19,6 +22,7 @@ public class ToJson {
 
 
     static long counter;
+    public static final byte[] BYTES = new byte[4096];
 
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
         Driver DRIVER = com.mysql.jdbc.Driver.class.newInstance();
@@ -29,14 +33,17 @@ public class ToJson {
 
         ResultSet sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
 
-        List <String>tables = new ArrayList<String>();
+
+        List<String> tables = new ArrayList<String>();
         int c = 1;
         for (boolean valid = sourceTables.first(); valid; valid = sourceTables.next()) {
             tables.add(sourceTables.getString("TABLE_NAME"));
         }
 
-        Map<String, Map> rows = new LinkedHashMap<String, Map>();
-        for (String  name : tables) {
+//        Map<String, Map> rows = new LinkedHashMap<String, Map>();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        for (String name : tables) {
             Statement statement = connect.createStatement();
 
             ResultSet resultSet = statement.executeQuery("select * from " + name);
@@ -70,16 +77,29 @@ public class ToJson {
                 }
 
 
-                String str = (pk==null)?Long.toHexString((++counter)|0x1000000000l).substring(1):resultSet.getString(pk);
-                rows.put((name).concat("_").concat(str), row);
+                String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
+                String concat = name+("_")+(str);
+                URL url = new URL(new StringBuilder().append(args[4]).append('/').append(concat).toString());
+                HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
+                httpCon.setDoOutput(true);
+                httpCon.setRequestMethod("PUT");
+                String s = gson.toJson(row);
+                httpCon.setFixedLengthStreamingMode(s.length());
+                gson.toJson(Arrays.asList(url,row),System.out);
+                httpCon.getOutputStream().write(s.getBytes(Charset.forName("UTF8")));
+                OutputStream outputStream = httpCon.getOutputStream();
+                outputStream.flush();
+                httpCon.getInputStream().read(BYTES);
+                httpCon.disconnect();
+
                 valid = resultSet.next();
             }
 
 
         }
 
-        Gson gson= new GsonBuilder().setPrettyPrinting().create();
-        gson.toJson(rows, new FileWriter(args[1] + ".json"));
+
+//        gson.toJson(rows, new FileWriter(args[1] + ".json"));
 
     }
 
