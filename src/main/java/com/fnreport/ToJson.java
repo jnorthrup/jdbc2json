@@ -83,7 +83,7 @@ public class ToJson {
                 httpCon.setFixedLengthStreamingMode(utf8s.length);
                 httpCon.setRequestMethod("PUT");
                 httpCon.setDoOutput(true);
-                gson.toJson(Arrays.asList(url, row), System.out);
+//                gson.toJson(Arrays.asList(url, row), System.out);
                 httpCon.getOutputStream().write(utf8s);
                 httpCon.getOutputStream().flush();
                 httpCon.disconnect();
