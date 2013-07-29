@@ -26,7 +26,7 @@ public class ToJson {
         String jdbcurl = null;
         Driver DRIVER;
         if (args.length > 5) {
-            DRIVER = DriverManager.getDriver(jdbcurl = args[6]);
+            DRIVER = DriverManager.getDriver(jdbcurl = args[5]);
         }
         else {
             DRIVER = com.mysql.jdbc.Driver.class.newInstance();
