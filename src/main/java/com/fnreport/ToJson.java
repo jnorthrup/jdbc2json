@@ -25,8 +25,8 @@ public class ToJson {
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
         String jdbcurl = null;
         Driver DRIVER;
-        if (args.length > 3) {
-            DRIVER = DriverManager.getDriver(jdbcurl = args[4]);
+        if (args.length > 5) {
+            DRIVER = DriverManager.getDriver(jdbcurl = args[6]);
         }
         else {
             DRIVER = com.mysql.jdbc.Driver.class.newInstance();
