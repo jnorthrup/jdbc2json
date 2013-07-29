@@ -23,10 +23,18 @@ public class ToJson {
     public static final byte[] BYTES = new byte[4096];
 
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
-        Driver DRIVER = com.mysql.jdbc.Driver.class.newInstance();
+        String jdbcurl = null;
+        Driver DRIVER;
+        if (args.length > 3) {
+            DRIVER = DriverManager.getDriver(jdbcurl = args[4]);
+        }
+        else {
+            DRIVER = com.mysql.jdbc.Driver.class.newInstance();
+            jdbcurl = MessageFormat.format("jdbc:mysql://{0}/{1}?zeroDateTimeBehavior=convertToNull&user={2}&password={3}", args[0], args[1], args[2], args[3]);
 
-        String jdbcurl = MessageFormat.format("jdbc:mysql://{0}/{1}?zeroDateTimeBehavior=convertToNull&user={2}&password={3}", args[0], args[1], args[2], args[3]);
-        Connection connect = DRIVER.connect(jdbcurl, new Properties());
+        }
+
+         Connection connect = DRIVER.connect(jdbcurl, new Properties());
         DatabaseMetaData metaData = connect.getMetaData();
 
         ResultSet sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
