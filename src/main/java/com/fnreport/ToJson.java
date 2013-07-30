@@ -20,7 +20,6 @@ public class ToJson {
 
 
     static long counter;
-    public static final byte[] BYTES = new byte[4096];
 
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
         String jdbcurl = null;
@@ -64,9 +63,26 @@ public class ToJson {
             } catch (SQLException e) {
 
             }
+            boolean first = true;
+            while (  resultSet.next()) {
+                         if(first){
+//                             String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
+                             first=false;
+                             String spec = new StringBuilder().append(args[4]).append('/').append(name).toString();
+                             URL url = new URL(spec);
+                             HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
+                             byte[] utf8s = "{}".getBytes();
+//                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
+                             httpCon.setFixedLengthStreamingMode(utf8s.length);
+                             httpCon.setRequestMethod("PUT");
+                             httpCon.setUseCaches(true);
+                             httpCon.setDoOutput(true);
+//                gson.toJson(Arrays.asList(url, row), System.out);
+                             httpCon.getOutputStream().write(utf8s);
+                             httpCon.getOutputStream().flush();
+                             httpCon.disconnect();
 
-            boolean valid = resultSet.first();
-            while (valid) {
+                         }
                 Map row = new LinkedHashMap();
 
                 for (int i = 1; i < columnCount + 1; ++i) {
@@ -84,26 +100,22 @@ public class ToJson {
 
 
                 String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
-                String concat = name + ("_") + (str);
-                URL url = new URL(new StringBuilder().append(args[4]).append('/').append(concat).toString());
+                String spec = new StringBuilder().append(args[4]).append('/').append(name).append("/") .append(str).toString();
+                URL url = new URL(spec);
                 HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
                 byte[] utf8s = gson.toJson(row).getBytes("UTF8");
+//                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
                 httpCon.setFixedLengthStreamingMode(utf8s.length);
                 httpCon.setRequestMethod("PUT");
+                httpCon.setUseCaches(true);
                 httpCon.setDoOutput(true);
 //                gson.toJson(Arrays.asList(url, row), System.out);
                 httpCon.getOutputStream().write(utf8s);
                 httpCon.getOutputStream().flush();
                 httpCon.disconnect();
-
-                valid = resultSet.next();
             }
-
-
         }
 
-
-//        gson.toJson(rows, new FileWriter(args[1] + ".json"));
 
     }
 
