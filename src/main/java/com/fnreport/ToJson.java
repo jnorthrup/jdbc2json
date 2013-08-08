@@ -42,22 +42,30 @@ public class ToJson {
         List<String> tables = new ArrayList<String>();
         int c = 1;
         for (boolean valid = sourceTables.first(); valid; valid = sourceTables.next()) {
-            tables.add(sourceTables.getString("TABLE_NAME"));
+            String table_schem = sourceTables.getString("TABLE_SCHEM");
+            String table_name = sourceTables.getString("TABLE_NAME");
+            if(table_schem!=null&&!table_schem.isEmpty()) {table_name=table_schem+'.'+table_name;}
+            {
+                tables.add(table_name);
+            }
         }
 
 //        Map<String, Map> rows = new LinkedHashMap<String, Map>();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-        for (String name : tables) {
+        for (String tablename : tables) {
+
+            String[] split = tablename.split("\\.", 2);
+            String name = split.length > 1 ? split[1] : tablename;
             Statement statement = connect.createStatement();
 
-            ResultSet resultSet = statement.executeQuery("select * from " + name);
+            ResultSet resultSet = statement.executeQuery("select * from " + tablename );
             ResultSetMetaData metaData1 = resultSet.getMetaData();
             int columnCount = metaData1.getColumnCount();
 
             String pk = null;
             try {
-                ResultSet primaryKeys = metaData.getPrimaryKeys(null, null, name);
+                ResultSet primaryKeys = metaData.getPrimaryKeys(null, split.length>1?split[0]:null, name);
                 primaryKeys.next();
                 pk = primaryKeys.getString(4);
             } catch (SQLException e) {
@@ -115,11 +123,6 @@ public class ToJson {
                 httpCon.disconnect();
             }
         }
-
-
     }
 
 }
-
-
-
