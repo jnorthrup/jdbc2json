@@ -1,5 +1,6 @@
 package com.fnreport;
 
+import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -18,7 +19,9 @@ import java.util.*;
  */
 public class ToJson {
 
-
+    public static final GsonBuilder BUILDER =
+            new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
+                    FieldNamingPolicy.IDENTITY).setPrettyPrinting();
     static long counter;
 
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
@@ -51,7 +54,7 @@ public class ToJson {
         }
 
 //        Map<String, Map> rows = new LinkedHashMap<String, Map>();
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson =BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
 
         for (String tablename : tables) {
 
