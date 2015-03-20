@@ -17,51 +17,50 @@
       <version>2.2.4</version>
     </dependency>
 
-
+    <!--<profiles>-->
+      <!--<profile>-->
+        <!--<id>psql</id>-->
+        <!--<dependencies>-->
+          <dependency>
+            <groupId>postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>9.1-901.jdbc4</version>
+          </dependency>
+        <!--</dependencies>-->
+      <!--</profile>-->
+      <!--<profile>-->
+        <!--<id>mysql</id>-->
+        <!--<dependencies>-->
+          <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.18</version>
+          </dependency>
+        <!--</dependencies>-->
+      <!--</profile>-->
+      <!--<profile>-->
+        <!--<id>jtds</id>-->
+        <!--<dependencies>-->
+          <dependency>
+            <groupId>net.sourceforge.jtds</groupId>
+            <artifactId>jtds</artifactId>
+            <version>1.3.1</version>
+          </dependency>
+        <!--</dependencies>-->
+      <!--</profile>-->
+      <!--<profile>-->
+        <!--<id>ms-sql</id>-->
+        <!--<dependencies>-->
+          <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>sqljdbc4</artifactId>
+            <version>4.1</version>
+          </dependency>
+        <!--</dependencies>-->
+      <!--</profile>-->
+    <!--</profiles>-->
   </dependencies>
-  <profiles>
-    <profile>
-      <id>psql</id>
-      <dependencies>
-        <dependency>
-          <groupId>postgresql</groupId>
-          <artifactId>postgresql</artifactId>
-          <version>9.1-901.jdbc4</version>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>mysql</id>
-      <dependencies>
-        <dependency>
-          <groupId>mysql</groupId>
-          <artifactId>mysql-connector-java</artifactId>
-          <version>5.1.18</version>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>jtds</id>
-      <dependencies>
-        <dependency>
-          <groupId>net.sourceforge.jtds</groupId>
-          <artifactId>jtds</artifactId>
-          <version>1.3.1</version>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>ms-sql</id>
-      <dependencies>
-        <dependency>
-          <groupId>com.microsoft.sqlserver</groupId>
-          <artifactId>sqljdbc4</artifactId>
-          <version>4.1</version>
-        </dependency>
-      </dependencies>
-    </profile>
 
-  </profiles>
   <build>
     <plugins>
       <plugin>
