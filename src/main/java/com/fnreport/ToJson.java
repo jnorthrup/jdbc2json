@@ -28,12 +28,12 @@ public class ToJson {
         String jdbcurl = null;
         Driver DRIVER;
         if (args.length > 5) {
-            DRIVER = DriverManager.getDriver(jdbcurl = args[5]);
+            final String arg = args[5];
+             DRIVER = DriverManager.getDriver(jdbcurl = arg);
         }
         else {
             DRIVER = com.mysql.jdbc.Driver.class.newInstance();
             jdbcurl = MessageFormat.format("jdbc:mysql://{0}/{1}?zeroDateTimeBehavior=convertToNull&user={2}&password={3}", args[0], args[1], args[2], args[3]);
-
         }
 
          Connection connect = DRIVER.connect(jdbcurl, new Properties());
@@ -44,7 +44,8 @@ public class ToJson {
 
         List<String> tables = new ArrayList<String>();
         int c = 1;
-        for (boolean valid = sourceTables.first(); valid; valid = sourceTables.next()) {
+        while(sourceTables.next())
+        {
             String table_schem = sourceTables.getString("TABLE_SCHEM");
             String table_name = sourceTables.getString("TABLE_NAME");
             if(table_schem!=null&&!table_schem.isEmpty()) {table_name=table_schem+'.'+table_name;}
@@ -92,7 +93,6 @@ public class ToJson {
                              httpCon.getOutputStream().write(utf8s);
                              httpCon.getOutputStream().flush();
                              httpCon.disconnect();
-
                          }
                 Map row = new LinkedHashMap();
 
