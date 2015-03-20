@@ -27,16 +27,10 @@ public class ToJson {
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
         String jdbcurl = null;
         Driver DRIVER;
-        if (args.length > 5) {
-            final String arg = args[5];
-             DRIVER = DriverManager.getDriver(jdbcurl = arg);
-        }
-        else {
-            DRIVER = com.mysql.jdbc.Driver.class.newInstance();
-            jdbcurl = MessageFormat.format("jdbc:mysql://{0}/{1}?zeroDateTimeBehavior=convertToNull&user={2}&password={3}", args[0], args[1], args[2], args[3]);
-        }
+        jdbcurl = args.length > 5 ? args[5] : MessageFormat.format("jdbc:mysql://{0}/{1}?zeroDateTimeBehavior=convertToNull&user={2}&password={3}", args[0], args[1], args[2], args[3]);
+        DRIVER = DriverManager.getDriver(jdbcurl);
 
-         Connection connect = DRIVER.connect(jdbcurl, new Properties());
+        Connection connect = DRIVER.connect(jdbcurl, new Properties());
         DatabaseMetaData metaData = connect.getMetaData();
 
         ResultSet sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
@@ -44,18 +38,19 @@ public class ToJson {
 
         List<String> tables = new ArrayList<String>();
         int c = 1;
-        while(sourceTables.next())
-        {
+        while (sourceTables.next()) {
             String table_schem = sourceTables.getString("TABLE_SCHEM");
             String table_name = sourceTables.getString("TABLE_NAME");
-            if(table_schem!=null&&!table_schem.isEmpty()) {table_name=table_schem+'.'+table_name;}
+            if (table_schem != null && !table_schem.isEmpty()) {
+                table_name = table_schem + '.' + table_name;
+            }
             {
                 tables.add(table_name);
             }
         }
 
 //        Map<String, Map> rows = new LinkedHashMap<String, Map>();
-        Gson gson =BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
+        Gson gson = BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
 
         for (String tablename : tables) {
 
@@ -63,37 +58,37 @@ public class ToJson {
             String name = split.length > 1 ? split[1] : tablename;
             Statement statement = connect.createStatement();
 
-            ResultSet resultSet = statement.executeQuery("select * from " + tablename );
+            ResultSet resultSet = statement.executeQuery("select * from " + tablename);
             ResultSetMetaData metaData1 = resultSet.getMetaData();
             int columnCount = metaData1.getColumnCount();
 
             String pk = null;
             try {
-                ResultSet primaryKeys = metaData.getPrimaryKeys(null, split.length>1?split[0]:null, name);
+                ResultSet primaryKeys = metaData.getPrimaryKeys(null, split.length > 1 ? split[0] : null, name);
                 primaryKeys.next();
                 pk = primaryKeys.getString(4);
             } catch (SQLException e) {
 
             }
             boolean first = true;
-            while (  resultSet.next()) {
-                         if(first){
+            while (resultSet.next()) {
+                if (first) {
 //                             String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
-                             first=false;
-                             String spec = new StringBuilder().append(args[4]).append('/').append(name).toString();
-                             URL url = new URL(spec);
-                             HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
-                             byte[] utf8s = "{}".getBytes();
+                    first = false;
+                    String spec = new StringBuilder().append(args[4]).append('/').append(name).toString();
+                    URL url = new URL(spec);
+                    HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
+                    byte[] utf8s = "{}".getBytes();
 //                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
-                             httpCon.setFixedLengthStreamingMode(utf8s.length);
-                             httpCon.setRequestMethod("PUT");
-                             httpCon.setUseCaches(true);
-                             httpCon.setDoOutput(true);
+                    httpCon.setFixedLengthStreamingMode(utf8s.length);
+                    httpCon.setRequestMethod("PUT");
+                    httpCon.setUseCaches(true);
+                    httpCon.setDoOutput(true);
 //                gson.toJson(Arrays.asList(url, row), System.out);
-                             httpCon.getOutputStream().write(utf8s);
-                             httpCon.getOutputStream().flush();
-                             httpCon.disconnect();
-                         }
+                    httpCon.getOutputStream().write(utf8s);
+                    httpCon.getOutputStream().flush();
+                    httpCon.disconnect();
+                }
                 Map row = new LinkedHashMap();
 
                 for (int i = 1; i < columnCount + 1; ++i) {
@@ -111,7 +106,7 @@ public class ToJson {
 
 
                 String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
-                String spec = new StringBuilder().append(args[4]).append('/').append(name).append("/") .append(str).toString();
+                String spec = new StringBuilder().append(args[4]).append('/').append(name).append("/").append(str).toString();
                 URL url = new URL(spec);
                 HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
                 byte[] utf8s = gson.toJson(row).getBytes("UTF8");
