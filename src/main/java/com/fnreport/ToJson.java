@@ -72,10 +72,11 @@ public class ToJson {
             }
             boolean first = true;
             while (resultSet.next()) {
+                final String couchprefix = args[4];
                 if (first) {
 //                             String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
                     first = false;
-                    String spec = new StringBuilder().append(args[4]).append('/').append(name).toString();
+                    String spec = new StringBuilder().append(couchprefix) .append(name).toString();
                     URL url = new URL(spec);
                     HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
                     byte[] utf8s = "{}".getBytes();
@@ -106,7 +107,7 @@ public class ToJson {
 
 
                 String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
-                String spec = new StringBuilder().append(args[4]).append('/').append(name).append("/").append(str).toString();
+                String spec = new StringBuilder().append(couchprefix) .append(name).append("/").append(str).toString();
                 URL url = new URL(spec);
                 HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
                 byte[] utf8s = gson.toJson(row).getBytes("UTF8");
