@@ -57,7 +57,15 @@ public class ToJson {
             String[] split = tablename.split("\\.", 2);
             String name = split.length > 1 ? split[1] : tablename;
             Statement statement = connect.createStatement();
+            {
 
+                ResultSet resultSet = statement.executeQuery("select count(*) from " + tablename);
+                                      resultSet.next();
+                final long aLong = resultSet.getLong(1);
+                System.err.println("table: "+tablename+" "+aLong);
+                resultSet.close();
+
+            }
             ResultSet resultSet = statement.executeQuery("select * from " + tablename);
             ResultSetMetaData metaData1 = resultSet.getMetaData();
             int columnCount = metaData1.getColumnCount();
