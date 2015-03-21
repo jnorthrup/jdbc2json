@@ -109,7 +109,9 @@ public class BatchBuild {
                         Object object = resultSet.getObject(i);
                         if (object instanceof Date) {
                             Date date = (Date) object;
-                            object=new Date(date.toGMTString());
+
+
+                            object= date.getTime();
                         }
                         row.put(columnName, object);
 
