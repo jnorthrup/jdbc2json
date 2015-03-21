@@ -18,6 +18,7 @@ import java.util.*;
  * Time: 12:53 AM
  */
 public class ToJson {
+    static {System.setProperty("user.timezone","UTC");}
 
     public static final GsonBuilder BUILDER =
             new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
