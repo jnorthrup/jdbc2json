@@ -79,7 +79,7 @@
                   <mainClass>com.fnreport.BatchBuild</mainClass>
                 </transformer>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                  <resource>META-INF/services</resource>
+                  <resource>META-INF/services/java.sql.Driver</resource>
                 </transformer>
               </transformers>
             </configuration>
