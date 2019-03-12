@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.*;
+import java.text.MessageFormat;
 import java.util.*;
 import java.util.Date;
+
+import static java.lang.System.exit;
 
 /**
  * Created by IntelliJ IDEA.
@@ -17,7 +20,9 @@ import java.util.Date;
  * Time: 12:53 AM
  */
 public class BatchBuild {
-    static {System.setProperty("user.timezone","UTC");}
+    static {
+        System.setProperty("user.timezone", "UTC");
+    }
 
     public static final GsonBuilder BUILDER =
             new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
@@ -25,7 +30,9 @@ public class BatchBuild {
     static long counter;
 
     static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
-
+        if (args.length < 1) {
+            System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n{0} name ''sql'' pkname couch_prefix ''jdbc-url''", BatchBuild.class.getCanonicalName()));
+        exit(1);}
 
         final String name = args[0];
         final String sql = args[1];
@@ -45,7 +52,7 @@ public class BatchBuild {
             if (first) {
 //                             String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
                 first = false;
-                String spec = new StringBuilder().append(couchPrefix) .append(name).toString();
+                String spec = new StringBuilder().append(couchPrefix).append(name).toString();
                 URL url = new URL(spec);
                 HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
                 byte[] utf8s = "{}".getBytes();
@@ -70,7 +77,7 @@ public class BatchBuild {
                         Date date = (Date) object;
 
 
-                        object= date.getTime();
+                        object = date.getTime();
                     }
                     row.put(columnName, object);
 
@@ -83,7 +90,7 @@ public class BatchBuild {
 
             final String string = resultSet1.getString(pkname);
             String _id = (pkname == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : string;
-            String spec = new StringBuilder().append(couchPrefix) .append(name).append("/").append(_id).toString();
+            String spec = new StringBuilder().append(couchPrefix).append(name).append("/").append(_id).toString();
             URL url = new URL(spec);
             HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
             byte[] utf8s = BUILDER.create().toJson(row).getBytes("UTF8");
