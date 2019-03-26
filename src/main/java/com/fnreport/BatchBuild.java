@@ -29,7 +29,7 @@ public class BatchBuild {
                     FieldNamingPolicy.IDENTITY).setPrettyPrinting();
     static long counter;
 
-    static public void main(String... args) throws IllegalAccessException, InstantiationException, SQLException, IOException {
+    static public void main(String... args) throws   Exception {
         if (args.length < 1) {
             System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n{0} name ''sql'' pkname couch_prefix ''jdbc-url''", BatchBuild.class.getCanonicalName()));
         exit(1);}
