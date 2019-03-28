@@ -5,4 +5,4 @@
 #    )
 set -x
 JDIR=$(dirname $0)/../
-java  ${HAZELCAST_SUPPORT[@]} -classpath "$JDIR./target/*:$JDIR./target/lib/*"  ${EXECMAIN:=com.fnreport.ToJson} $@
+java  ${HAZELCAST_SUPPORT[@]} -Drest.async=${ASYNC:=false} -classpath "$JDIR./target/*:$JDIR./target/lib/*"  ${EXECMAIN:=com.fnreport.ToJson} $@

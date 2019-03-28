@@ -32,7 +32,7 @@ public class ToJson {
 
     static public void main(String... args) throws Exception {
         if (args.length < 1) {
-            System.err.println("copy all tables to json PUT\n\t" + ToJson.class.getCanonicalName() + " dbhost dbname user password couchprefix [jdbc:url:etc]");
+            System.err.println("copy all tables to json PUT\n\t  [ASYNC=true]  " + ToJson.class.getCanonicalName() + " dbhost dbname user password couchprefix [jdbc:url:etc]");
             exit(1);
         }
         Driver DRIVER;
@@ -41,7 +41,9 @@ public class ToJson {
                 "?zeroDateTimeBehavior=convertToNull&user=" + args[2] +
                 "&password=" + args[3];
         DRIVER = DriverManager.getDriver(jdbcurl);
-
+        boolean ASYNC = "true".equals(System.getenv("ASYNC"))
+                ;
+        System.err.println("\"rest.async\" is "+ASYNC);
         Connection connect = DRIVER.connect(jdbcurl, new Properties());
         DatabaseMetaData metaData = connect.getMetaData();
 
@@ -106,7 +108,9 @@ public class ToJson {
                             outputStream.flush();
                         }
 
-                        tablecreation = Collections.singletonMap("initial_access", httpCon.getResponseCode());
+
+
+                            tablecreation = Collections.singletonMap("initial_access", httpCon.getResponseCode());
 
                         httpCon.disconnect();
                     }
@@ -141,13 +145,17 @@ public class ToJson {
                             outputStream.flush();
                         }
                     } finally {
-                        int responseCode = httpCon.getResponseCode();
-                        responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
+                        if (!ASYNC) {
+                            int responseCode = httpCon.getResponseCode();
+                            responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
+                        }
                         httpCon.disconnect();
 
                     }
                 }
-                System.err.println(Arrays.deepToString(new Object[]{tableAccessUrl, tablecreation, responses}));
+
+
+                    System.err.println(Arrays.deepToString(new Object[]{tableAccessUrl, tablecreation, responses}));
             }
         }
     }
