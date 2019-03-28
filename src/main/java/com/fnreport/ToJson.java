@@ -9,8 +9,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
-import java.text.MessageFormat;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.System.exit;
 
@@ -36,10 +36,10 @@ public class ToJson {
             exit(1);
         }
         Driver DRIVER;
-        String jdbcurl = args.length > 5 ? args[5] :  "jdbc:mysql://" + args[0]+
-        "/" + args[1]+
-        "?zeroDateTimeBehavior=convertToNull&user=" + args[2]+
-        "&password=" + args[3] ;
+        String jdbcurl = args.length > 5 ? args[5] : "jdbc:mysql://" + args[0] +
+                "/" + args[1] +
+                "?zeroDateTimeBehavior=convertToNull&user=" + args[2] +
+                "&password=" + args[3];
         DRIVER = DriverManager.getDriver(jdbcurl);
 
         Connection connect = DRIVER.connect(jdbcurl, new Properties());
@@ -47,6 +47,7 @@ public class ToJson {
 
         ResultSet sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
 
+        String couchprefix = args[4];
 
         List<String> tables = new ArrayList<String>();
         int c = 1;
@@ -87,8 +88,11 @@ public class ToJson {
                     throw new Error("refine");
                 }
                 boolean first = true;
+                Map<Integer, AtomicInteger> responses = new LinkedHashMap<>();
+                String tableAccessUrl = couchprefix + name + "/";
+
+                Map<String, Integer> tablecreation = Collections.EMPTY_MAP;
                 while (resultSet.next()) {
-                    final String couchprefix = args[4];
                     if (first) {
                         first = false;
                         HttpURLConnection httpCon = (HttpURLConnection) new URL(couchprefix + name).openConnection();
@@ -101,6 +105,9 @@ public class ToJson {
                             outputStream.write(utf8s);
                             outputStream.flush();
                         }
+
+                        tablecreation = Collections.singletonMap("initial_access", httpCon.getResponseCode());
+
                         httpCon.disconnect();
                     }
                     Map<String, Object> row = new LinkedHashMap<>();
@@ -119,20 +126,28 @@ public class ToJson {
 
 
                     String str = pk == null ? Long.toHexString(++counter | 0x1000000000L).substring(1) : resultSet.getString(pk);
-                    HttpURLConnection httpCon = (HttpURLConnection) new URL(couchprefix + name + "/" + str).openConnection();
-                    byte[] utf8s = gson.toJson(row).getBytes(StandardCharsets.UTF_8);
-                    //                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
-                    httpCon.setFixedLengthStreamingMode(utf8s.length);
-                    httpCon.setRequestMethod("PUT");
-                    httpCon.setUseCaches(true);
-                    httpCon.setDoOutput(true);
-                    //                gson.toJson(Arrays.asList(url, row), System.out);
-                    try (OutputStream outputStream = httpCon.getOutputStream()) {
-                        outputStream.write(utf8s);
-                        outputStream.flush();
+                    HttpURLConnection httpCon = null;
+                    try {
+                        httpCon = (HttpURLConnection) new URL(tableAccessUrl + str).openConnection();
+                        byte[] utf8s = gson.toJson(row).getBytes(StandardCharsets.UTF_8);
+                        //                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
+                        httpCon.setFixedLengthStreamingMode(utf8s.length);
+                        httpCon.setRequestMethod("PUT");
+                        httpCon.setUseCaches(true);
+                        httpCon.setDoOutput(true);
+                        //                gson.toJson(Arrays.asList(url, row), System.out);
+                        try (OutputStream outputStream = httpCon.getOutputStream()) {
+                            outputStream.write(utf8s);
+                            outputStream.flush();
+                        }
+                    } finally {
+                        int responseCode = httpCon.getResponseCode();
+                        responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
+                        httpCon.disconnect();
+
                     }
-                    httpCon.disconnect();
                 }
+                System.err.println(Arrays.deepToString(new Object[]{tableAccessUrl, tablecreation, responses}));
             }
         }
     }
