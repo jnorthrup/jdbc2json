@@ -66,8 +66,8 @@ public class ToJson {
         Gson gson = BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
 
         for (String tablename : tables) {
-            String[] split = tablename.split("\\.", 2);
-            String name = split.length > 1 ? split[1] : tablename;
+            String[] realm = tablename.split("\\.", 2);
+            String name = realm.length > 1 ? realm[1] : tablename;
             Statement statement = connect.createStatement();
 
 
@@ -82,12 +82,15 @@ public class ToJson {
                 ResultSetMetaData metaData1 = resultSet.getMetaData();
                 int columnCount = metaData1.getColumnCount();
                 String pk = null;
-                try (ResultSet primaryKeys = metaData.getPrimaryKeys(null, split.length > 1 ? split[0] : null, name)) {
+                try (ResultSet primaryKeys = metaData.getPrimaryKeys(null, realm.length > 1 ? realm[0] : null, name)) {
                     primaryKeys.next();
                     pk = primaryKeys.getString(4);
                 } catch (SQLException e) {
+                    System.err.println("no pk for "+tablename);
+                    /*
                     e.printStackTrace();
                     throw new Error("refine");
+*/
                 }
                 boolean first = true;
                 Map<Integer, AtomicInteger> responses = new LinkedHashMap<>();
