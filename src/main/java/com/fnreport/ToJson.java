@@ -25,8 +25,9 @@ public class ToJson {
             new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
                     FieldNamingPolicy.IDENTITY).setPrettyPrinting();
     public static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
+    public static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
     static long counter;
-    public static boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
+
     static {
         System.setProperty("user.timezone", "UTC");
     }
@@ -117,7 +118,7 @@ public class ToJson {
                         //sync the table creation
 
                         System.err.println(Arrays.deepToString(
-                                new Object[]{dest,httpCon.getResponseCode(),
+                                new Object[]{dest, httpCon.getResponseCode(),
                                         httpCon.getResponseMessage()}));
 
 
@@ -133,14 +134,26 @@ public class ToJson {
                         try {
                             Object object = resultSet.getObject(i);
 
-                            if(object instanceof String&& USEJSONINPUT)
-                                    row.put(columnName, object);
+                            if (object instanceof String && USEJSONINPUT) {
+                                String s = String.valueOf(object).trim();
+                                if (!s.isBlank())
+                                    switch (new StringBuilder().append(s.charAt(0)).append(s.charAt(s.length() - 1)).toString()) {
+                                        case "[]":
+                                            object = gson.fromJson(s, Array.class);
+                                            break;
+                                        case "{}":
+                                            object = gson.fromJson(s, Map.class);
+                                            break;
+                                        default:
+                                            break;
+                                    }
+                            }
+                            row.put(columnName, object);
                         } catch (SQLException e) {
                             System.err.println("cannot store " + columnType + " as column " + columnName + " with value ");
                             row.put(columnName, resultSet.getString(i));
                         }
                     }
-
 
 
                     String str = pk == null ? Long.toHexString(++counter | 0x1000000000L).substring(1) : resultSet.getString(pk);

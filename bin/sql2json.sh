@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
+set -fx
 JDIR=$(dirname $0)/../
-java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.BatchBuild} "$1" "$2" "$3" "$4" "$5"
+exec java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.BatchBuild} ${@}
