@@ -13,7 +13,8 @@ run from project dir using scripts in bin:
 ## per query:
 
 ```bash
-ASYNC=true JSONINPUT=true bin/sql2json.sh episodes  podcast_id http://0.0.0.0:5984/testing_  'jdbc:mysql://0.0.0.0/foo_production?user=root&password='$pw  select \*  from oss_episode```
+ASYNC=true JSONINPUT=true bin/sql2json.sh episodes  podcast_id http://0.0.0.0:5984/testing_  'jdbc:mysql://0.0.0.0/foo_production?user=root&password='$pw  select \*  from oss_episode
+```
 
 ## per tablespace:
 
