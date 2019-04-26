@@ -1,25 +1,38 @@
-this converts mysql databases to couchdb or other REST PUT methods.
+this converts jdbc databases to couchdb or other REST PUT methods.
 
-this is a java/maven uberjar design which creates an executable jarfile
+this README file is almost as long as the code.  call these scripts with no params for simple help. 
 
 
-ubuntu instructions:
+# build
+mvn install 
 
-sudo apt-get install maven2 couchdb
+run from project dir using scripts in bin:
 
-cd ./jmysqltojson
+# examples:
 
-mvn assembly:assembly
+## per query:
 
-#if all builds well, this is the next step
+```bash
+ASYNC=true JSONINPUT=true bin/sql2json.sh episodes  podcast_id http://0.0.0.0:5984/testing_  'jdbc:mysql://0.0.0.0/foo_production?user=root&password='$pw  select \*  from oss_episode
+```
 
-cd target
+## per tablespace:
 
-java -jar  jmysql2json-0.0.1-SNAPSHOT-jar-with-dependencies.jar mysqlhost mysqlinstance  mysqluser mysqlpassword http://localhost:5984/couchdb
+```bash
+ASYNC=true    bin/jdbc2json.sh 0.0.0.0 foo_production root $pw http://0.0.0.0:5984/cms_
+``` 
 
-# (5 paramters, no slash at end of url)
-1. mysqlhost 
-2. mysqlinstance 
-3. mysqluser 
-4. mysqlpassword 
-5. http://localhost:5984/couchdb
+## env variables:
+`ASYNC=true `
+ * default behavior will collect a map of result code counters which will tell you how many inserts (201) succeeded, and how many fails (409) result from the REST calls
+ 
+`JSONINPUT=true `
+ * this will make a best-attempt to find escaped json strings and store the unescaped version 
+ 
+ # todo
+  * [x] asyncronous REST inserts 
+  * [x] reify json strings
+  * [ ] bulk inserts
+  * [ ] enable Gson builder configs in env
+  * [ ] configurable Numerics options like squelching ".0" 
+  
