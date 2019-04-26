@@ -22,8 +22,7 @@ import static java.lang.System.exit;
  */
 public class ToJson {
     static final GsonBuilder BUILDER =
-            new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
-                    FieldNamingPolicy.IDENTITY).setPrettyPrinting();
+            new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(FieldNamingPolicy.IDENTITY).setPrettyPrinting();
     public static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
     public static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
     static long counter;
