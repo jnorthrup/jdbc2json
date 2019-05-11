@@ -65,7 +65,7 @@ public class BatchBuild {
         ResultSetMetaData metaData1 = null;
         try (var resultSet = DRIVER.connect(jdbcUrl, new Properties()).createStatement().executeQuery(sql)) {
             metaData1 = resultSet.getMetaData();
-            int columnCount = 0;
+            int columnCount = 0;int responseCode = 0;
             try {
                 columnCount = metaData1.getColumnCount();
 
@@ -92,6 +92,7 @@ public class BatchBuild {
 //                gson.toJson(Arrays.asList(url, row), System.out);
                         httpCon.getOutputStream().write(utf8s);
                         httpCon.getOutputStream().flush();
+                        if(!ASYNC)responseCode=httpCon.getResponseCode();
                         httpCon.disconnect();
                     }
                     Map row = new LinkedHashMap();
@@ -117,8 +118,8 @@ public class BatchBuild {
                                                 break;
                                         }
                                     } catch (JsonSyntaxException e) {
-                                        System.err.println( s);
-                                        System.err.println( e.getMessage());
+                                        System.err.println(s);
+                                        System.err.println(e.getMessage());
 
                                     }
                             }
@@ -131,7 +132,9 @@ public class BatchBuild {
 
                     String _id = pkname.isBlank() ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pkname);
                     String spec = new StringBuilder().append(couchPrefix).append(couchDbName).append("/").append(_id).toString();
-                    URL url = new URL(spec);
+
+
+                    var url = new URL(spec);
                     HttpURLConnection httpCon = null;
                     try {
 
@@ -153,16 +156,20 @@ public class BatchBuild {
 //                gson.toJson(Arrays.asList(url, row), System.out);
                         httpCon.getOutputStream().write(bytes);
                         httpCon.getOutputStream().flush();
+
                         if (!ASYNC) {
-                            int responseCode = httpCon.getResponseCode();
-                            responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
+                            responseCode = httpCon.getResponseCode();
+                        responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
+
                         }
+
                     } catch (IOException e) {
                         e.printStackTrace();
                     } finally {
                         httpCon.disconnect();
                     }
                 }
+
                 System.err.println(deepToString(asList(responses).toArray()));
             } catch (SQLException e) {
                 e.printStackTrace();
