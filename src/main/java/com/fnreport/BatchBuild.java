@@ -16,9 +16,12 @@ import java.text.MessageFormat;
 import java.util.*;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.lang.System.exit;
 import static java.util.Arrays.*;
+
 
 /**
  * Created by IntelliJ IDEA.
@@ -81,8 +84,21 @@ public class BatchBuild {
 //                             String str = (pk == null) ? Long.toHexString((++counter) | 0x1000000000l).substring(1) : resultSet.getString(pk);
                         first = false;
                         String spec = new StringBuilder().append(couchPrefix).append(couchDbName).toString();
+                        Pattern compile = Pattern.compile("(http[s]?://)([^:]+:[^@]+)@(.*)");
+                        Matcher matcher = compile.matcher(spec);
+                        String basic = null;
+                        if (matcher.matches()) {
+
+                            basic = "Basic " + new String(Base64.getEncoder().encode(matcher.group(2).getBytes()));
+spec=matcher.group(1)+matcher.group(3);
+
+                        }
+
                         URL url = new URL(spec);
                         HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
+                        if (null != basic) {
+                            httpCon.setRequestProperty("Authorization", basic);
+                        }
                         byte[] utf8s = "{}".getBytes();
 //                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
                         httpCon.setFixedLengthStreamingMode(utf8s.length);
@@ -92,7 +108,7 @@ public class BatchBuild {
 //                gson.toJson(Arrays.asList(url, row), System.out);
                         httpCon.getOutputStream().write(utf8s);
                         httpCon.getOutputStream().flush();
-                        if(!ASYNC)responseCode=httpCon.getResponseCode();
+                        if (!ASYNC) responseCode = httpCon.getResponseCode();
                         httpCon.disconnect();
                     }
                     Map row = new LinkedHashMap();
