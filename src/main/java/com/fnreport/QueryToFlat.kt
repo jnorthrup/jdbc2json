@@ -17,6 +17,7 @@ import kotlin.system.measureTimeMillis
  * User: jim
  */
 class QueryToFlat {
+
     companion object {
         val nothing = emptyList<String>()
         var x = nothing
@@ -45,22 +46,29 @@ class QueryToFlat {
                             System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
                                 System.err.println("loading meta for $tname")
 
-                                conn.metaData.getColumns(null, null, tname, null).also { rs ->
-                                    val m by lazy {
-                                        x.takeIf { it != nothing }
-                                                ?: (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).also {
-                                                    x = it;
-                                                    System.err.println("potential meta" to it)
-                                                }
-                                    }
+                                conn.metaData.getColumns(null, null, tname, null).also { rs: ResultSet ->
+                                    val x = (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).map(String::toUpperCase)
                                     meta[tname] = generateSequence {
                                         takeIf { rs.next() }?.let {
-                                            rs.getString("column_name") to m.map { mname -> mname to rs.getObject(mname) }.toMap<String, Any?>()
+                                            if (rs.row == 1) System.err.println("potential meta" to x)
+                                            rs.getString("COLUMN_NAME") to
+                                                    x.map {
+                                                        it  to
+                                                                rs.getObject(it)
+                                                    }.toMap<String, Any?>()
                                         }
                                     }.toMap()
                                 }
                             }
-                            System.err.println(meta.map { (k, v) -> k to v.map { (k, m) -> m["column_name"] to (JDBCType.values()[m["sql_data_type"] as Int] to m["char_octet_length"]) } })
+                            System.err.println(meta.map { (k, v) ->
+                                k to
+                                        v.map { (k, m) ->
+                                            m["COLUMN_NAME"] to
+                                                    (JDBCType.values()[
+                                                            m["SQL_DATA_TYPE"] as Int] to
+                                                            m["CHAR_OCTET_LENGTH"])
+                                        }
+                            })
 
                             val rs = conn.createStatement().executeQuery(sql)
                             val metaData = rs.metaData
@@ -68,7 +76,7 @@ class QueryToFlat {
 
                             data class flatSchemaColMeta(val name: String, val startcol: Int, val fieldLen: Int, val sqlType: SQLType)
 
-                            var lastlen = 0;
+                            var lastlen = 0
 
 
                             (1..metaData.columnCount).map { cnum ->
