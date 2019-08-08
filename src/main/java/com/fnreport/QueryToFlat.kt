@@ -59,15 +59,14 @@ class QueryToFlat {
                                 System.err.println("loading meta for $tname")
 
                                 conn.metaData.getColumns(null, null, tname, null).also { rs: ResultSet ->
-                                    val x = mutableListOf<String>()
-                                    (1..rs.metaData.columnCount).forEach { cnum: Int -> x += rs.metaData.getColumnName(cnum).toUpperCase() }
+                                    val x = (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).map(String::toUpperCase)
                                     meta[tname] = generateSequence {
                                         takeIf { rs.next() }?.let {
                                             if (rs.row == 1) System.err.println("potential meta" to x)
                                             rs.getString("COLUMN_NAME") to
-                                                    x.map { mname ->
-                                                        mname.toUpperCase() to
-                                                                rs.getObject(mname)
+                                                    x.map {
+                                                        it  to
+                                                                rs.getObject(it)
                                                     }.toMap<String, Any?>()
                                         }
                                     }.toMap()
