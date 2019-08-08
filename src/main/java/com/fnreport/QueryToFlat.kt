@@ -5,6 +5,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.lang.System.exit
 import java.sql.*
+import java.text.DateFormat
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -16,11 +17,9 @@ import kotlin.system.measureTimeMillis
  * User: jim
  */
 class QueryToFlat {
-
     companion object {
-
-        internal var counter: Long = 0
-
+        val nothing = emptyList<String>()
+        var x = nothing
 
         suspend fun go(vararg args: String) {
             if (args.size < 1) {
@@ -32,45 +31,36 @@ class QueryToFlat {
             val objectMapper = ObjectMapper()
             objectMapper.dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
-//        var rows= mutableMapOf <String,Pair<String,Map<String,Any?>>>();
-
-            var rows: Map<String, Pair<String, SortedMap<String, Any?>>> = mapOf()
-
-            lateinit var deleted: List<Map<String, Any>>
-            lateinit var added: List<Map<String, Any>>
-            lateinit var delta: List<Map<String, Any>>
-            var sqlms: Long = -1
-            var couchms: Long = -1
             runBlocking {
                 val jjob = launch {
                     val sql = asList(*args).subList(1, args.size).joinToString(" ")
 
                     System.err.println("using sql: $sql")
-                    val meta = mutableMapOf<String, Map<String,Map<String, Any?>>>()
+                    val meta = mutableMapOf<String, Map<String, Map<String, Any?>>>()
                     try {
                         val DRIVER = DriverManager.getDriver(jdbcUrl)
-                        sqlms = measureTimeMillis {
+                        measureTimeMillis {
 
-                            val conn = DRIVER.connect(jdbcUrl, null)
-
-                            val mastermeta = System.getenv("TABLENAME")?.let {
-                                it.split(",")
-                            }?.forEach { tname ->
+                            val conn = DRIVER.connect(jdbcUrl, System.getProperties())
+                            System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
                                 System.err.println("loading meta for $tname")
 
-                                conn.metaData.getColumns(null, null, tname, null).also { rs: ResultSet ->
-                                    val x = mutableListOf<String>()
-                                    (1..rs.metaData.columnCount).forEach { cnum: Int -> x += rs.metaData.getColumnName(cnum) }
+                                conn.metaData.getColumns(null, null, tname, null).also { rs ->
+                                    val m by lazy {
+                                        x.takeIf { it != nothing }
+                                                ?: (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).also {
+                                                    x = it;
+                                                    System.err.println("potential meta" to it)
+                                                }
+                                    }
                                     meta[tname] = generateSequence {
                                         takeIf { rs.next() }?.let {
-                                            if (rs.row == 1) System.err.println("potential meta" to x);
-                                            rs.getString("column_name")to x.map { mname -> mname to rs.getObject(mname) }.toMap<String, Any?>()
+                                            rs.getString("column_name") to m.map { mname -> mname to rs.getObject(mname) }.toMap<String, Any?>()
                                         }
                                     }.toMap()
-
                                 }
                             }
-                            System.err.println(meta.map {(k,v)-> k to v.map{ (k,m) ->   m["column_name"] to (JDBCType.values() [m["sql_data_type"] as Int] to m["char_octet_length"])}  })
+                            System.err.println(meta.map { (k, v) -> k to v.map { (k, m) -> m["column_name"] to (JDBCType.values()[m["sql_data_type"] as Int] to m["char_octet_length"]) } })
 
                             val rs = conn.createStatement().executeQuery(sql)
                             val metaData = rs.metaData
@@ -86,14 +76,10 @@ class QueryToFlat {
                                 val columnType1 = metaData.getColumnType(cnum)
                                 val columnType = columnType1
                                 columnType
-
-//                                flatSchemaColMeta(metaData.getColumnLabel(it),
-
-
                             }
 
 
-                            var pkfun: (Any) -> String = fun(any: Any): String { return any.toString() }
+
 
                             generateSequence { rs.takeIf { it.next() } }.map {
                                 (1..metaData.columnCount).map { cno ->
