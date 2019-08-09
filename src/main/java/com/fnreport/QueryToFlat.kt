@@ -66,7 +66,7 @@ class QueryToFlat {
             val rs = conn.createStatement().executeQuery(sql)
 
 
-            val os =System.getenv("FILENAME")?.let { BufferedOutputStream( FileOutputStream(it)) } ?: System.out
+            val os =System.getenv("OUTPUT")?.let { BufferedOutputStream( FileOutputStream(it)) } ?: System.out
 
 
             var cwidths=Array(0){0}
