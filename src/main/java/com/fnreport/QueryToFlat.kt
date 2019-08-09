@@ -70,6 +70,7 @@ class QueryToFlat {
 
 
             var cwidths=Array(0){0}
+            var cnames =Array(0){""}
             var cmax =-1
             val cr = "\n".toByteArray()
 
@@ -79,7 +80,16 @@ class QueryToFlat {
                         cwidths = (1..rs.metaData.columnCount ).map {
                             rs.metaData.getColumnDisplaySize(it)
                         }.toTypedArray()
+                        cnames = (1..rs.metaData.columnCount).map {
+                            rs.metaData.getColumnName(it)
+                        }.toTypedArray()
+
                         cmax = cwidths.max()!!
+                        System.err.println("read_fwf('fn'  ,header=3,")
+
+                        System.err.println("names=${cnames.map{"'$it'"} },")
+                        var accum=0;
+                        System.err.println("colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i   } }})")
                     }
 
                     (1..rs.metaData.columnCount).forEachIndexed {   i, ci ->
