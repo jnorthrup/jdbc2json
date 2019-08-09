@@ -3,12 +3,12 @@ package com.fnreport
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.BufferedOutputStream
+import java.io.FileOutputStream
 import java.lang.System.exit
 import java.sql.*
-import java.text.DateFormat
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
-import java.util.*
 import java.util.Arrays.asList
 import kotlin.system.measureTimeMillis
 
@@ -30,89 +30,76 @@ class QueryToFlat {
             val jdbcUrl = args[0]
 
             val objectMapper = ObjectMapper()
+
             objectMapper.dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
-            runBlocking {
-                val jjob = launch {
-                    val sql = asList(*args).subList(1, args.size).joinToString(" ")
+            val sql = asList(*args).subList(1, args.size).joinToString(" ")
 
-                    System.err.println("using sql: $sql")
-                    val meta = mutableMapOf<String, Map<String, Map<String, Any?>>>()
-                    try {
-                        val DRIVER = DriverManager.getDriver(jdbcUrl)
-                        measureTimeMillis {
+            System.err.println("using sql: $sql")
+            val meta = mutableMapOf<String, Map<String, Map<String, Any?>>>()
+            val DRIVER = DriverManager.getDriver(jdbcUrl)
+            val conn = DRIVER.connect(jdbcUrl, System.getProperties())
+            System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
+                System.err.println("loading meta for $tname")
 
-                            val conn = DRIVER.connect(jdbcUrl, System.getProperties())
-                            System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
-                                System.err.println("loading meta for $tname")
-
-                                conn.metaData.getColumns(null, null, tname, null).also { rs: ResultSet ->
-                                    val x = (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).map(String::toUpperCase)
-                                    meta[tname] = generateSequence {
-                                        takeIf { rs.next() }?.let {
-                                            if (rs.row == 1) System.err.println("potential meta" to x)
-                                            rs.getString("COLUMN_NAME") to
-                                                    x.map {
-                                                        it  to
-                                                                rs.getObject(it)
-                                                    }.toMap<String, Any?>()
-                                        }
-                                    }.toMap()
-                                }
-                            }
-                            System.err.println(meta.map { (k, v) ->
-                                k to
-                                        v.map { (k, m) ->
-                                            m["COLUMN_NAME"] to
-                                                    (JDBCType.values()[
-                                                            m["SQL_DATA_TYPE"] as Int] to
-                                                            m["CHAR_OCTET_LENGTH"])
-                                        }
-                            })
-
-                            val rs = conn.createStatement().executeQuery(sql)
-                            val metaData = rs.metaData
-                            var pkCol = 0
-
-                            data class flatSchemaColMeta(val name: String, val startcol: Int, val fieldLen: Int, val sqlType: SQLType)
-
-                            var lastlen = 0
-
-
-                            (1..metaData.columnCount).map { cnum ->
-                                val typ: JDBCType = JDBCType.valueOf(metaData.getColumnType(cnum))
-                                val columnType1 = metaData.getColumnType(cnum)
-                                val columnType = columnType1
-                                columnType
-                            }
-
-
-
-
-                            generateSequence { rs.takeIf { it.next() } }.map {
-                                (1..metaData.columnCount).map { cno ->
-                                    metaData.getColumnName(cno) to it.getObject(cno).let { s ->
-                                        s
-                                    }
-                                }
-                            }
+                conn.metaData.getColumns(null, null, tname, null).also { rs: ResultSet ->
+                    val x = (1..rs.metaData.columnCount).map(rs.metaData::getColumnName).map(String::toUpperCase)
+                    meta[tname] = generateSequence {
+                        takeIf { rs.next() }?.let {
+                            if (rs.row == 1) System.err.println("driver-specific potential meta" to x)
+                            rs.getString("COLUMN_NAME") to x.map { it to rs.getObject(it) }.toMap()
                         }
-                    } catch (e: SQLException) {
-                        e.printStackTrace()
-                        exit(1)
+                    }.toMap()
+                }
+            }
 
+            System.err.println(meta.map { (k, v) ->
+                k to v.map { (_, m) ->
+                    val any = m["SQL_DATA_TYPE"].takeUnless { it?.toString()?.toInt() == 0 }
+                            ?: m["DATA_TYPE"].toString().toInt()
+                    val jdbcType = JDBCType.values()[any as Int]
+                    m["COLUMN_NAME"] to (jdbcType.toString() + "($any)" to m["COLUMN_SIZE"])
+                }
+            })
+
+            System.err.println( objectMapper.writeValueAsString( meta))
+            val rs = conn.createStatement().executeQuery(sql)
+
+
+            val os =System.getenv("FILENAME")?.let { BufferedOutputStream( FileOutputStream(it)) } ?: System.out
+
+
+            var cwidths=Array(0){0}
+            var cmax =-1
+            val cr = "\n".toByteArray()
+
+            try {
+                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, rs  ->
+                    if (rownum == 0) {
+                        cwidths = (1..rs.metaData.columnCount ).map {
+                            rs.metaData.getColumnDisplaySize(it)
+                        }.toTypedArray()
+                        cmax = cwidths.max()!!
                     }
 
+                    (1..rs.metaData.columnCount).forEachIndexed {   i, ci ->
+                        val currentColWidth = cwidths[i]
+                        val oval = rs.getString(ci)?:""
 
+                        val outbuf = oval.toByteArray()
+                        val csz = outbuf.size
+                        os.write(when  {
+                            csz < currentColWidth -> outbuf + ByteArray(currentColWidth- csz){' '.toByte()}
+                            csz > currentColWidth -> outbuf.copyOfRange(0,currentColWidth-1)
+                            else -> outbuf
+                        })
+                    }
+
+                    os.write  (cr)
                 }
-
-//                (cjob).join()
-                (jjob).join()
-
+            } catch (t: Throwable) {
+                t.printStackTrace()
             }
-//        System.err.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(deleted + added + delta))
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(System.out, {})
-
         }
 
         @JvmStatic
