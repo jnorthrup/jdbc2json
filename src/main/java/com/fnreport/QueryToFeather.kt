@@ -81,7 +81,7 @@ class QueryToFeather {
             val cr = "\n".toByteArray()
 
              val sqlToArrow = JdbcToArrow.sqlToArrow(rs)
-             val arrowFileWriter = ArrowFileWriter(sqlToArrow, DictionaryProvider.MapDictionaryProvider(), Channels.newChannel(FileOutputStream(os)))
+             val arrowFileWriter = ArrowFileWriter(sqlToArrow, DictionaryProvider.MapDictionaryProvider(), Channels.newChannel(os))
              arrowFileWriter.writeBatch();
 
 arrowFileWriter.end();
@@ -90,6 +90,8 @@ arrowFileWriter.close();
         }
 
         @JvmStatic
-        fun main(vararg args: String) = runBlocking { go(*args) }
+        fun main(vararg args: String) = runBlocking {
+            System.setProperty( "io.netty.tryReflectionSetAccessible","true") //https://issues.apache.org/jira/browse/ARROW-5412?focusedCommentId=16861192&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-16861192
+            go(*args) }
     }
 }
