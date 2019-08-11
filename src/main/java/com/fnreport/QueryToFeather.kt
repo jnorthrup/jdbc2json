@@ -1,31 +1,38 @@
 package com.fnreport
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.apache.arrow.adapter.jdbc.JdbcToArrow
+import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils
+import org.apache.arrow.memory.RootAllocator
+import org.apache.arrow.vector.FieldVector
+import org.apache.arrow.vector.VectorSchemaRoot
+import org.apache.arrow.vector.dictionary.DictionaryProvider
+import org.apache.arrow.vector.ipc.ArrowFileWriter
 import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 import java.lang.System.exit
+import java.nio.channels.Channels
 import java.sql.*
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
+import java.util.*
 import java.util.Arrays.asList
-import kotlin.system.measureTimeMillis
 
 /**
  * write records using deterministic _rev on the intended json
  * User: jim
  */
-class QueryToFlat {
+class QueryToFeather {
     companion object {
         val nothing = emptyList<String>()
         var x = nothing
 
          fun go(vararg args: String) {
             if (args.size < 1) {
-                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLE='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
-                exit(1)
-            }
+                 System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLE='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFeather::class.java.canonicalName))
+                 exit(1)
+             }
             val jdbcUrl = args[0]
 
             val objectMapper = ObjectMapper()
@@ -73,42 +80,13 @@ class QueryToFlat {
             var cmax =-1
             val cr = "\n".toByteArray()
 
-            try {
-                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, rs  ->
-                    if (rownum == 0) {
-                        cwidths = (1..rs.metaData.columnCount ).map {
-                            rs.metaData.getColumnDisplaySize(it)
-                        }.toTypedArray()
-                        cnames = (1..rs.metaData.columnCount).map {
-                            rs.metaData.getColumnName(it)
-                        }.toTypedArray()
+             val sqlToArrow = JdbcToArrow.sqlToArrow(rs)
+             val arrowFileWriter = ArrowFileWriter(sqlToArrow, DictionaryProvider.MapDictionaryProvider(), Channels.newChannel(FileOutputStream(os)))
+             arrowFileWriter.writeBatch();
 
-                        cmax = cwidths.max()!!
-                        System.err.println("read_fwf('fn'  ,header=3,")
-
-                        System.err.println("names=${cnames.map{"'$it'"} },")
-                        var accum=0;
-                        System.err.println("colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i   } }})")
-                    }
-
-                    (1..rs.metaData.columnCount).forEachIndexed {   i, ci ->
-                        val currentColWidth = cwidths[i]
-                        val oval = rs.getString(ci)?:""
-
-                        val outbuf = oval.toByteArray()
-                        val csz = outbuf.size
-                        os.write(when  {
-                            csz < currentColWidth -> outbuf + ByteArray(currentColWidth- csz){' '.toByte()}
-                            csz > currentColWidth -> outbuf.copyOfRange(0,currentColWidth-1)
-                            else -> outbuf
-                        })
-                    }
-
-                    os.write  (cr)
-                }
-            } catch (t: Throwable) {
-                t.printStackTrace()
-            }
+arrowFileWriter.end();
+arrowFileWriter.close();
+             sqlToArrow.close()
         }
 
         @JvmStatic
