@@ -23,7 +23,7 @@ class QueryToFlat {
 
          fun go(vararg args: String) {
             if (args.size < 1) {
-                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLE='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
+                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLENAME='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
                 exit(1)
             }
             val jdbcUrl = args[0]
