@@ -1,16 +1,16 @@
 package com.fnreport
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 import java.lang.System.exit
-import java.sql.*
+import java.sql.DriverManager
+import java.sql.JDBCType
+import java.sql.ResultSet
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
 import java.util.Arrays.asList
-import kotlin.system.measureTimeMillis
 
 /**
  * write records using deterministic _rev on the intended json
@@ -21,7 +21,7 @@ class QueryToFlat {
         val nothing = emptyList<String>()
         var x = nothing
 
-         fun go(vararg args: String) {
+        fun go(vararg args: String) {
             if (args.size < 1) {
                 System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLENAME='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
                 exit(1)
@@ -61,22 +61,22 @@ class QueryToFlat {
                 }
             })
 
-            System.err.println( objectMapper.writeValueAsString( meta))
+            System.err.println(objectMapper.writeValueAsString(meta))
             val rs = conn.createStatement().executeQuery(sql)
 
 
-            val os =System.getenv("OUTPUT")?.let { BufferedOutputStream( FileOutputStream(it)) } ?: System.out
+            val os = System.getenv("OUTPUT")?.let { BufferedOutputStream(FileOutputStream(it)) } ?: System.out
 
 
-            var cwidths=Array(0){0}
-            var cnames =Array(0){""}
-            var cmax =-1
+            var cwidths = Array(0) { 0 }
+            var cnames = Array(0) { "" }
+            var cmax = -1
             val cr = "\n".toByteArray()
 
             try {
-                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, rs  ->
+                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, rs ->
                     if (rownum == 0) {
-                        cwidths = (1..rs.metaData.columnCount ).map {
+                        cwidths = (1..rs.metaData.columnCount).map {
                             rs.metaData.getColumnDisplaySize(it)
                         }.toTypedArray()
                         cnames = (1..rs.metaData.columnCount).map {
@@ -84,27 +84,27 @@ class QueryToFlat {
                         }.toTypedArray()
 
                         cmax = cwidths.max()!!
-                        System.err.println("read_fwf('fn'  ,header=3,")
+                        System.err.println("read_fwf('${System.getenv("OUTPUT") ?: "fn"}'  ,header=3,")
 
-                        System.err.println("names=${cnames.map{"'$it'"} },")
-                        var accum=0;
-                        System.err.println("colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i   } }})")
+                        System.err.println("names=${cnames.map { "'$it'" }},")
+                        var accum = 0
+                        System.err.println("colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i } }})")
                     }
 
-                    (1..rs.metaData.columnCount).forEachIndexed {   i, ci ->
+                    (1..rs.metaData.columnCount).forEachIndexed { i, ci ->
                         val currentColWidth = cwidths[i]
-                        val oval = rs.getString(ci)?:""
+                        val oval = rs.getString(ci) ?: ""
 
                         val outbuf = oval.toByteArray()
                         val csz = outbuf.size
-                        os.write(when  {
-                            csz < currentColWidth -> outbuf + ByteArray(currentColWidth- csz){' '.toByte()}
-                            csz > currentColWidth -> outbuf.copyOfRange(0,currentColWidth-1)
+                        os.write(when {
+                            csz < currentColWidth -> outbuf + ByteArray(currentColWidth - csz) { ' '.toByte() }
+                            csz > currentColWidth -> outbuf.copyOfRange(0, currentColWidth - 1)
                             else -> outbuf
                         })
                     }
 
-                    os.write  (cr)
+                    os.write(cr)
                 }
             } catch (t: Throwable) {
                 t.printStackTrace()

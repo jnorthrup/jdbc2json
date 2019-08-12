@@ -3,20 +3,17 @@ package com.fnreport
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.runBlocking
 import org.apache.arrow.adapter.jdbc.JdbcToArrow
-import org.apache.arrow.adapter.jdbc.JdbcToArrowUtils
-import org.apache.arrow.memory.RootAllocator
-import org.apache.arrow.vector.FieldVector
-import org.apache.arrow.vector.VectorSchemaRoot
 import org.apache.arrow.vector.dictionary.DictionaryProvider
 import org.apache.arrow.vector.ipc.ArrowFileWriter
 import java.io.BufferedOutputStream
 import java.io.FileOutputStream
 import java.lang.System.exit
 import java.nio.channels.Channels
-import java.sql.*
+import java.sql.DriverManager
+import java.sql.JDBCType
+import java.sql.ResultSet
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
-import java.util.*
 import java.util.Arrays.asList
 
 /**
@@ -28,11 +25,11 @@ class QueryToFeather {
         val nothing = emptyList<String>()
         var x = nothing
 
-         fun go(vararg args: String) {
+        fun go(vararg args: String) {
             if (args.size < 1) {
-                 System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLE='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFeather::class.java.canonicalName))
-                 exit(1)
-             }
+                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [TABLE='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFeather::class.java.canonicalName))
+                exit(1)
+            }
             val jdbcUrl = args[0]
 
             val objectMapper = ObjectMapper()
@@ -68,30 +65,22 @@ class QueryToFeather {
                 }
             })
 
-            System.err.println( objectMapper.writeValueAsString( meta))
+            System.err.println(objectMapper.writeValueAsString(meta))
             val rs = conn.createStatement().executeQuery(sql)
+            val os = System.getenv("OUTPUT")?.let { BufferedOutputStream(FileOutputStream(it)) } ?: System.out
+            val sqlToArrow = JdbcToArrow.sqlToArrow(rs)
+            val arrowFileWriter = ArrowFileWriter(sqlToArrow, DictionaryProvider.MapDictionaryProvider(), Channels.newChannel(os))
+            arrowFileWriter.writeBatch()
 
-
-            val os =System.getenv("OUTPUT")?.let { BufferedOutputStream( FileOutputStream(it)) } ?: System.out
-
-
-            var cwidths=Array(0){0}
-            var cnames =Array(0){""}
-            var cmax =-1
-            val cr = "\n".toByteArray()
-
-             val sqlToArrow = JdbcToArrow.sqlToArrow(rs)
-             val arrowFileWriter = ArrowFileWriter(sqlToArrow, DictionaryProvider.MapDictionaryProvider(), Channels.newChannel(os))
-             arrowFileWriter.writeBatch();
-
-arrowFileWriter.end();
-arrowFileWriter.close();
-             sqlToArrow.close()
+            arrowFileWriter.end()
+            arrowFileWriter.close()
+            sqlToArrow.close()
         }
 
         @JvmStatic
         fun main(vararg args: String) = runBlocking {
-            System.setProperty( "io.netty.tryReflectionSetAccessible","true") //https://issues.apache.org/jira/browse/ARROW-5412?focusedCommentId=16861192&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-16861192
-            go(*args) }
+            System.setProperty("io.netty.tryReflectionSetAccessible", "true") //https://issues.apache.org/jira/browse/ARROW-5412?focusedCommentId=16861192&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-16861192
+            go(*args)
+        }
     }
 }
