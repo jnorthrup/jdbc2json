@@ -85,11 +85,13 @@ class QueryToFlat {
 
                         var accum = 0
                         cmax = cwidths.max()!!
-                        System.err.println("""import pandas as pd;
-                            d1=pd.read_fwf('${System.getenv("OUTPUT")
-                                ?: "fn"}'  ,header=3,
-                                "names=${cnames.map { "'$it'" }},
-                                "colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i } }})""")
+                        val ofile = System.getenv("OUTPUT") ?: "fn"
+                        System.err.println("""
+                            #some sample pandas code
+                            import pandas as pd;
+                            d1=pd.read_fwf('$ofile', 
+                            names=${cnames.map { "'$it'" }},
+                            colspecs=${cwidths.map { i: Int -> accum to accum + i.also { accum += i } }})""".trimIndent())
                     }
 
                     (1..rs.metaData.columnCount).forEachIndexed { i, ci ->
