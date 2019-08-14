@@ -83,12 +83,13 @@ class QueryToFlat {
                             rs.metaData.getColumnName(it)
                         }.toTypedArray()
 
-                        cmax = cwidths.max()!!
-                        System.err.println("read_fwf('${System.getenv("OUTPUT") ?: "fn"}'  ,header=3,")
-
-                        System.err.println("names=${cnames.map { "'$it'" }},")
                         var accum = 0
-                        System.err.println("colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i } }})")
+                        cmax = cwidths.max()!!
+                        System.err.println("""import pandas as pd;
+                            d1=pd.read_fwf('${System.getenv("OUTPUT")
+                                ?: "fn"}'  ,header=3,
+                                "names=${cnames.map { "'$it'" }},
+                                "colspecs=${cwidths.mapIndexed { index, i -> accum to accum + i.also { accum += i } }})""")
                     }
 
                     (1..rs.metaData.columnCount).forEachIndexed { i, ci ->
