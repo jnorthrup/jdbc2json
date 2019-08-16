@@ -23,8 +23,8 @@ import static java.lang.System.exit;
 public class ToJson {
     static final GsonBuilder BUILDER =
             new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(FieldNamingPolicy.IDENTITY).setPrettyPrinting();
-    public static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
-    public static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
+    static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
+    static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
     static long counter;
 
     static {
@@ -63,21 +63,16 @@ public class ToJson {
             }
             tables.add(table_name);
         }
-
-//        Map<String, Map> rows = new LinkedHashMap<String, Map>();
         Gson gson = BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
-
         for (String tablename : tables) {
             String[] realm = tablename.split("\\.", 2);
             String name = realm.length > 1 ? realm[1] : tablename;
             Statement statement = connect.createStatement();
 
-
             try (ResultSet resultSet = statement.executeQuery("select count(*) from " + tablename)) {
                 resultSet.next();
                 final long aLong = resultSet.getLong(1);
                 System.err.println("table: " + tablename + " " + aLong);
-                resultSet.close();
             }
 
             try (ResultSet resultSet = statement.executeQuery("select * from " + tablename)) {
@@ -96,13 +91,13 @@ public class ToJson {
                 }
                 boolean first = true;
                 Map<Integer, AtomicInteger> responses = new LinkedHashMap<>();
-                String tableAccessUrl = couchprefix + name + "/";
+                String tableAccessUrl = couchprefix + name.toLowerCase() + "/";
 
                 Map<String, Integer> tablecreation = Collections.EMPTY_MAP;
                 while (resultSet.next()) {
                     if (first) {
                         first = false;
-                        String dest = couchprefix + name.toLowerCase().replaceAll("\\W+","_");
+                        String dest = couchprefix + name.toLowerCase().replaceAll("\\W+", "_");
                         HttpURLConnection httpCon = (HttpURLConnection) new URL(dest).openConnection();
 
                         byte[] utf8s = "{}".getBytes();
@@ -160,12 +155,10 @@ public class ToJson {
                     try {
                         httpCon = (HttpURLConnection) new URL(tableAccessUrl + str).openConnection();
                         byte[] utf8s = gson.toJson(row).getBytes(StandardCharsets.UTF_8);
-                        //                httpCon.getRequestProperties().put("Content-Type", asList("application/json"))  ;
                         httpCon.setFixedLengthStreamingMode(utf8s.length);
                         httpCon.setRequestMethod("PUT");
                         httpCon.setUseCaches(true);
                         httpCon.setDoOutput(true);
-                        //                gson.toJson(Arrays.asList(url, row), System.out);
                         try (OutputStream outputStream = httpCon.getOutputStream()) {
                             outputStream.write(utf8s);
                             outputStream.flush();
