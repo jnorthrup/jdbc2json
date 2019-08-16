@@ -30,6 +30,7 @@ class ReiterateDb {
         internal var counter: Long = 0
 
 
+        val objectMapper = ObjectMapper().apply{dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")}
         suspend fun go(vararg args: String) {
             if (args.size < 1) {
                 System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n  [SORTINTS=false] [ALLORNOTHING=true] [JSONINPUT=false] {0} name pkname couch_prefix ''jdbc-url''  <sql>   ", ReiterateDb::class.java.canonicalName))
@@ -39,13 +40,8 @@ class ReiterateDb {
             val couchPrefix = args[2]
             val jdbcUrl = args[3]
 
-            val objectMapper = ObjectMapper()
-            objectMapper.dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
             System.err.println("\"use json rows\" is $USEJSONINPUT")
             System.err.println("\"sort integer keys\" is $SORTINTS")
-
-//        var rows= mutableMapOf <String,Pair<String,Map<String,Any?>>>();
-
             var rows: Map<String, Pair<String, SortedMap<String, Any?>>> = mapOf()
 
             lateinit var deleted: List<Map<String, Any>>
@@ -69,8 +65,6 @@ class ReiterateDb {
                         System.err.println(e.localizedMessage)
                     }
                 }
-
-
                 val jjob = launch {
                     val sql = asList(*args).subList(4, args.size).joinToString(" ")
                     val pkname = args[1]
