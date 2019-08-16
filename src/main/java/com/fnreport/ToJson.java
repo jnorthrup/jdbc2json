@@ -102,7 +102,7 @@ public class ToJson {
                 while (resultSet.next()) {
                     if (first) {
                         first = false;
-                        String dest = couchprefix + name;
+                        String dest = couchprefix + name.toLowerCase().replaceAll("\\W+","_");
                         HttpURLConnection httpCon = (HttpURLConnection) new URL(dest).openConnection();
 
                         byte[] utf8s = "{}".getBytes();
