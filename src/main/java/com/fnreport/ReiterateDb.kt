@@ -7,9 +7,7 @@ import java.io.InputStreamReader
 import java.lang.System.exit
 import java.net.HttpURLConnection
 import java.net.URL
-import java.sql.DriverManager
-import java.sql.JDBCType
-import java.sql.SQLException
+import java.sql.*
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,7 +28,7 @@ class ReiterateDb {
         internal var counter: Long = 0
 
 
-        val objectMapper = ObjectMapper().apply{dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")}
+        val objectMapper = ObjectMapper().apply { dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ") }
         suspend fun go(vararg args: String) {
             if (args.size < 1) {
                 System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n  [SORTINTS=false] [ALLORNOTHING=true] [JSONINPUT=false] {0} name pkname couch_prefix ''jdbc-url''  <sql>   ", ReiterateDb::class.java.canonicalName))
@@ -55,11 +53,9 @@ class ReiterateDb {
 
                     try {
                         couchms = measureTimeMillis {
-                            val urlConnection: HttpURLConnection = URL(couchPrefix + '/' + couchDbName + '/' + "_all_docs?include_docs=true").openConnection() as HttpURLConnection
-                            val couchRes = objectMapper.readValue(InputStreamReader(urlConnection.inputStream), Map::class.java)
+                            val couchRes = getExistingJsonFromCouchDb(couchPrefix, couchDbName)
 
-                            rows = ((couchRes["rows"] as List<Map<String, Any?>>)).filter { it["id"].toString().startsWith("_").not() }
-                                    .map { rowMap -> rowMap["doc"] as Map<String, Any?> }.map { docMap: Map<String, Any?> -> docMap["_id"].toString() to (docMap["_rev"].toString() to docMap.filter { (key, vl) -> !key.startsWith("_") && vl != null }.toSortedMap()) }.toMap()
+                            rows = getCouchdbRows(couchRes)
                         }
                     } catch (e: Throwable) {
                         System.err.println(e.localizedMessage)
@@ -88,38 +84,30 @@ class ReiterateDb {
                             }
 
 
-                            var pkfun: (Any) -> String = fun (any:Any):String{   return any.toString() }
+                            var pkfun: (Any) -> String = fun(any: Any): String { return any.toString() }
 
                             if (SORTINTS) {
                                 pkfun = when (pktype) {
                                     in arrayOf(
                                             JDBCType.BIGINT,
                                             JDBCType.NUMERIC
-                                    ) -> fun (any:Any):String{ return (("$any".toLong()) + 100_0000_0000_0000_0000L).toString().drop(1) }
+                                    ) -> fun(any: Any): String { return (("$any".toLong()) + 100_0000_0000_0000_0000L).toString().drop(1) }
                                     in arrayOf(
                                             JDBCType.INTEGER
-                                    ) -> fun (any:Any):String{ return  (("$any".toLong()) + 5_000_000_000L).toString().drop(1) }
+                                    ) -> fun(any: Any): String { return (("$any".toLong()) + 5_000_000_000L).toString().drop(1) }
                                     in arrayOf(
                                             JDBCType.TINYINT,
                                             JDBCType.SMALLINT
-                                    ) -> fun (any:Any):String { return (("$any".toLong()) + 4_000_000L).toString().drop(1) }
-                                    else -> pkfun;
+                                    ) -> fun(any: Any): String { return (("$any".toLong()) + 4_000_000L).toString().drop(1) }
+                                    else -> pkfun
                                 }
                             }
-                            jdbcRows = generateSequence { rs.takeIf { it.next() } }.map {
-                                (1..metaData.columnCount).map { cno ->
-                                    metaData.getColumnName(cno) to it.getObject(cno).let { s ->
-                                        s.takeIf { USEJSONINPUT && it is String && it.isNotBlank() && it.length > 1 }?.toString()?.trim()?.let { it ->
-                                            when (it.first() to it.last()) {
-                                                '[' to ']' ->
-                                                    objectMapper.readValue(it, List::class.java)
-                                                '{' to '}' ->
-                                                    objectMapper.readValue(it, Map::class.java)
-                                                else -> it
-                                            }
-                                        } ?: s
-                                    }
-                                }.filter { (f, s) -> s != null }.sortedBy { (f, s) -> f }.toMap()
+                            val rsSequence = generateSequence { rs.takeIf { it.next() } }
+                            val rowSequence = rsSequence.map { sortedRows(metaData, it) }.asSequence()
+
+
+                            jdbcRows = rsSequence.map { rs ->
+                                sortedRows(metaData, rs).toMap()
                             }.map { map ->
                                 pkfun(map[pkname]!!) to
                                         objectMapper.readValue(objectMapper.writeValueAsString(map), Map::class.java)
@@ -175,6 +163,60 @@ class ReiterateDb {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(System.out, out)
 
         }
+
+        fun sortedRows(metaData: ResultSetMetaData, it: ResultSet) =
+                rawRowValues(metaData, it).sortedBy { (f, s) -> f }
+
+        fun rawRowValues(metaData: ResultSetMetaData, it: ResultSet) =
+                rawRowSequence(metaData, it).filter { (f, s) -> s != null }.asSequence()
+
+        fun rawRowSequence(metaData: ResultSetMetaData, it: ResultSet) = jdbcColValsWithJson(metaData, it).asSequence()
+
+
+        fun jdbcColValsWithJson(metaData: ResultSetMetaData, rs: ResultSet): List<Pair<String, Any>> =
+                (1..metaData.columnCount).map { cno ->
+                    metaData.getColumnName(cno) to rs.getObject(cno).let { s ->
+                        s.takeIf { USEJSONINPUT && it is String && it.isNotBlank() && it.length > 1 }?.toString()?.trim()?.let { it ->
+                            when (it.first() to it.last()) {
+                                '[' to ']' ->
+                                    objectMapper.readValue(it, List::class.java)
+                                '{' to '}' ->
+                                    objectMapper.readValue(it, Map::class.java)
+                                else -> it
+                            }
+                        } ?: s
+                    }
+                }
+
+        fun jdbcSimpleResultPairs(metaData: ResultSetMetaData, rs: ResultSet) =
+                (1..metaData.columnCount).map { cno ->
+                    metaData.getColumnName(cno) to rs.getObject(cno)
+                }
+
+        /**
+         * simplest possible array of values from simplest possible array of headers/names/whatever
+         */
+        fun jdbcRowsArray(iterable: Iterable<Any?>, rs: ResultSet) =
+                iterable.mapIndexed { index, _ -> index+1}.map(rs::getObject)
+
+        /**
+         * simplest possible list of row names
+         */
+        fun jdbcMetaColNames(metaData: ResultSetMetaData) =
+                (1..metaData.columnCount).map(metaData::getColumnName)
+
+
+
+        private fun getCouchdbRows(couchRes: Map<*, *>?) =
+                (couchRes?.get("rows") as List<Map<String, Any?>>).filter { it["id"].toString().startsWith("_").not() }
+                        .map { rowMap -> rowMap["doc"] as Map<String, Any?> }.map { docMap: Map<String, Any?> -> docMap["_id"].toString() to (docMap["_rev"].toString() to docMap.filter { (key, vl) -> !key.startsWith("_") && vl != null }.toSortedMap()) }.toMap()
+
+        private fun getExistingJsonFromCouchDb(couchPrefix: String, couchDbName: String): Map<*, *>? {
+            val urlConnection: HttpURLConnection = URL(couchPrefix + '/' + couchDbName + '/' + "_all_docs?include_docs=true").openConnection() as HttpURLConnection
+            val couchRes = objectMapper.readValue(InputStreamReader(urlConnection.inputStream), Map::class.java)
+            return couchRes
+        }
+
         @JvmStatic
         fun main(vararg args: String) = runBlocking { ReiterateDb.go(*args) }
     }
