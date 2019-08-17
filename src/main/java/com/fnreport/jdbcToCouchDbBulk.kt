@@ -1,16 +1,16 @@
 package com.fnreport
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fnreport.jdbcToCouchDbBulk.objectMapper
-import com.fnreport.jdbcToCouchDbBulk.resultSequence
+import com.fnreport.jdbcmeta.ColumnMetaColumns
+import com.fnreport.jdbcmeta.TableMeta
 import java.lang.System.*
 import java.sql.DatabaseMetaData
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.text.SimpleDateFormat
-import com.fnreport.PkSeqMeta.COLUMN_NAME as COLUMN_NAME1
-import com.fnreport.PkSeqMeta.KEY_SEQ as KEY_SEQ1
+import com.fnreport.jdbcmeta.PkSeqMeta.COLUMN_NAME as COLUMN_NAME1
+import com.fnreport.jdbcmeta.PkSeqMeta.KEY_SEQ as KEY_SEQ1
 
 
 open class EnvConfig(val name: String, val defValue: String? = null, val docString: String? = null) {
@@ -58,19 +58,25 @@ object jdbcToCouchDbBulk {
 
         err.println("driver info for '$jdbcUrl' ${driver.toString()} ")
         err.println("connection info: ${connection.clientInfo}")
-        val metaData = connection.metaData
+        val dbMeta = connection.metaData
         val couchprefix = args[0]
         Triple(catalogg.value, schemaa.value, tablenamePattern.value).let { (cname, sname, tpat) ->
             val typs = typesConfig.value?.let { objectMapper.readValue(it, Array<String>::class.java) }
-            val sourceTables = metaData.getTables(cname, sname, tpat, typs)
+            val sourceTables = dbMeta.getTables(cname, sname, tpat, typs)
             val jdbcColumnNames = jdbcColumnNames(sourceTables.metaData)
-            val jdbcRowArray = jdbcRowArray(jdbcColumnNames, sourceTables).toList()
-            err.println()
+            err.println(jdbcColumnNames.toString())
+            val rows = jdbcRows(jdbcColumnNames, sourceTables).toList()
+
+            rows.forEach{
+                err.println("${it.dropLast(2)}")
+            }
+
+
         }
     }
 
     fun jdbcColumnNames(meta: ResultSetMetaData) = (1..meta.columnCount).map { meta.getColumnLabel(it) }
-    fun jdbcRowArray(hdr: Iterable<*>, rs: ResultSet) = resultSequence(rs).map { hdr.mapIndexed { index, _ -> index + 1 }.map { rs.getObject(it) } }
+    fun jdbcRows(hdr: Iterable<*>, rs: ResultSet) = resultSequence(rs).map { hdr.mapIndexed { index, _ -> index + 1 }.map { rs.getObject(it) } }
     fun resultSequence(rs: ResultSet) = generateSequence { rs.takeIf { rs.next() } }
     fun jdbcColumnNameToOrdinal(dbMeta: DatabaseMetaData, cat: String?, schem: String?, tname: String, cname: String) =
             dbMeta.getColumns(cat, schem, tname, cname).also { it.next() }.getInt(ColumnMetaColumns.ORDINAL_POSITION.ordinal)

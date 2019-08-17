@@ -1,4 +1,4 @@
-package com.fnreport
+package com.fnreport.jdbcmeta
 /**     * <P>Each primary key column description has the following columns:
  *  <OL>
  *  <LI><B>TABLE_CAT</B> String {@code =>} table catalog (may be <code>null</code>)

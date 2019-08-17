@@ -1,4 +1,4 @@
-package com.fnreport
+package com.fnreport.jdbcmeta
 
 /**  * <P>Only column descriptions matching the catalog, schema, table
  * and column name criteria are returned.  They are ordered by
