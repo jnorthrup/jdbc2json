@@ -14,6 +14,7 @@ import java.sql.DriverManager
 import java.sql.ResultSet
 import java.text.SimpleDateFormat
 import kotlin.system.exitProcess
+import kotlin.system.measureNanoTime
 import kotlin.text.Charsets.UTF_8
 
 object JdbcToCouchDbBulk {
@@ -112,25 +113,25 @@ object JdbcToCouchDbBulk {
                                     couchConn.requestMethod = "POST"
                                     couchConn.setRequestProperty("Content-Type", "application/json")
                                     couchConn.doOutput = true
-                                    @Language("JavaScript") val viewCode = """function (doc) {
-    var pkeys = ${json(pkColumns)};
-    var columns = ${json(columnNameArray)};
-    var e = {}; 
-
-    var row = doc.row;
-    var length = row.length;
-    for (var i = 0; i < length; i++) e[columns[i]] = row[i]
-    emit(doc._id, e)
-}""".trimIndent()
+                                    @Language("JavaScript")
+                                    val viewCode = """function (doc) {
+                                        var pkeys = ${json(pkColumns)};
+                                        var columns = ${json(columnNameArray)};
+                                        var e = {}; 
+                                        var row = doc.row;
+                                        var length = row.length;
+                                        for (var i = 0; i < length; i++) e[columns[i]] = row[i];
+                                        emit(${if (pkColumns.size < 2) "doc._id" else "JSON.parse(doc._id)"}, e )
+                                    }""".trimIndent()
                                     @Language("JSON") val terseViewsString = """{
-  "_id": "_design/meta",
-  "views": {
-    "asMap": {
-      "map": ${json(viewCode)} 
-    }
-  },
-  "language": "javascript"
-}""".trimIndent()
+                                                                                              "_id": "_design/meta",
+                                                                                              "views": {
+                                                                                                "asMap": {
+                                                                                                  "map": ${json(viewCode)} 
+                                                                                                }
+                                                                                              },
+                                                                                              "language": "javascript"
+                                                                                            }""".trimIndent()
                                     err.println("attempting to write:\n" + terseViewsString + "\n----------")
                                     couchConn.outputStream.write(terseViewsString.toByteArray(UTF_8))
 
@@ -138,56 +139,61 @@ object JdbcToCouchDbBulk {
                                     couchConn.disconnect()
                                 }
                                 val row = jdbcRows(columnNameArray, this)
+                                var tableNs = measureNanoTime {
+                                    var counter  = 0
+                                    row.chunked(bulkSize)
+                                            .forEach { rowChunk: List<List<Any>> ->
+                                                val ns = measureNanoTime {
+                                                    try {
+                                                        couchConn = URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
+                                                        couchConn.requestMethod = "POST"
+                                                        couchConn.setRequestProperty("Content-Type", "application/json")
+                                                        couchConn.doInput = true
+                                                        couchConn.doOutput = true
+                                                    } catch (e: IOException) {
+                                                        err.println("" +
+                                                                couchConn.responseCode + " : " + couchConn.responseMessage
+                                                        )
+                                                        e.printStackTrace()
+                                                        exitProcess(1)
+                                                    }
+                                                    val couchBatch = rowChunk.map { row ->
 
-                                row.chunked(bulkSize)
-                                        .forEach { rowChunk ->
-                                            try {
-                                                couchConn = URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
-                                                couchConn.requestMethod = "POST"
-                                                couchConn.setRequestProperty("Content-Type", "application/json")
-                                                couchConn.doInput = true
-                                                couchConn.doOutput = true
-                                            } catch (e: IOException) {
-                                                err.println("" +
-                                                        couchConn.responseCode + " : " + couchConn.responseMessage
-                                                )
-                                                e.printStackTrace()
-                                                exitProcess(1)
+                                                        if (!terse)
+                                                            columnNameArray.mapIndexed { index, s -> s to row[index] }.let { data ->
+                                                                when (pkColumns.size) {
+                                                                    0 -> emptyList<Pair<String, *>>()
+                                                                    1 -> listOf("_id" to row[pkColumns.first() - 1].toString())
+                                                                    else -> listOf("_id" to json(pkColumns.map { row[it - 1] }))
+                                                                } + data
+                                                            }.toMap()
+                                                        else
+                                                            row.let { data ->
+                                                                when (pkColumns.size) {
+                                                                    0 -> emptyList<Pair<String, *>>()
+                                                                    1 -> listOf("_id" to row[pkColumns.first() - 1].toString())
+                                                                    else -> listOf("_id" to json(pkColumns.map { row[it - 1] }))
+                                                                } + listOf("row" to data)
+                                                            }.toMap()
+
+                                                    }
+
+                                                    val content = json(mapOf("docs" to couchBatch))
+                                                    couchConn.outputStream.write(content.toByteArray(UTF_8))
+                                                    couchConn.outputStream.close()
+//                                                err.println("${couchConn.url} : ${couchConn.responseCode} : ${couchConn.responseMessage}")
+
+                                                }
+                                                ++counter
+                                                val l = counter% 100
+                                                        if ( 1 == l &&ns>0&& rowChunk.isNotEmpty()) {
+                                                            err.println("chunk rows: ${rowChunk.size} ns: $ns row/s:${"%.2f".format(rowChunk.size * 1e9.toDouble() / ns)}/s")
+                                                        }
                                             }
-                                            val couchBatch = rowChunk.map { row ->
 
-                                                if (!terse)
-                                                    columnNameArray.mapIndexed { index, s -> s to row[index] }.let { data ->
-                                                        when (pkColumns.size) {
-                                                            0 -> emptyList<Pair<String, *>>()
-                                                            1 -> listOf("_id" to row[pkColumns.first() - 1].toString())
-                                                            else -> listOf("_id" to json(pkColumns.map { row[it - 1] }))
-                                                        } + data
-                                                    }.toMap()
-                                                else
-                                                    row.let { data ->
-                                                        when (pkColumns.size) {
-                                                            0 -> emptyList<Pair<String, *>>()
-                                                            1 -> listOf("_id" to row[pkColumns.first() - 1].toString())
-                                                            else -> listOf("_id" to json(pkColumns.map { row[it - 1] }))
-                                                        } + listOf("row" to data)
-                                                    }.toMap()
-
-                                            }
-
-                                            val content = json(mapOf("docs" to couchBatch))
-//                                            err.println(content)
-                                            couchConn.outputStream.write(content.toByteArray(UTF_8))
-                                            couchConn.outputStream.close()
-                                            err.println("${couchConn.url} : ${couchConn.responseCode} : ${couchConn.responseMessage}")
-                                            /* try{
-                                                 err.println(String(couchConn.inputStream.readAllBytes()))
-                                             } catch (e: IOException) {
-
-                                                 e.printStackTrace()
-                                                 exitProcess(1)
-                                             }*/
-                                        }
+                                }
+                                if(rowCount>0){err.println("total rows: ${rowCount} s: ${tableNs/1e9}  row/s:${"%.2f".format(rowCount * 1e9.toDouble() / tableNs)}/s\n\n")
+                                }
                             }
                         }
                     }
