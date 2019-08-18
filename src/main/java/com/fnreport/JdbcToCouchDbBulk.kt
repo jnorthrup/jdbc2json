@@ -19,8 +19,8 @@ object JdbcToCouchDbBulk {
 
 
     val fetchSize = EnvConfig("FETCHSIZE")
+    val useTerse = EnvConfig("TERSE", docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object.")
     val schemaa = EnvConfig("SCHEMAPATTERN")
-
     val catalogg = EnvConfig("CATALOG")
 
     val tablenamePattern = EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also")
@@ -30,7 +30,7 @@ object JdbcToCouchDbBulk {
                        "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
 
     val configs: List<EnvConfig>
-        get() = listOf(fetchSize, catalogg, schemaa, tablenamePattern, typesConfig)
+        get() = listOf(useTerse,fetchSize, catalogg, schemaa, tablenamePattern, typesConfig)
 
     fun go(args: Array<out String>) {
         if (args.size < 2) {
@@ -93,15 +93,18 @@ object JdbcToCouchDbBulk {
                                 }
                                 err.println("$viewHeader")
 
-                                val row1 = jdbcRows(columnNameArray, this).first()
-                                val data = columnNameArray.mapIndexed{index, s ->s to  row1[index]  }
-                                err.println(
-                                 json ((when(pkColumns.size){
-                                     0->emptyList<Pair <String,*>>()
-                                     1->listOf ("_id" to row1[pkColumns.first()-1 ].toString())
-                                     else -> listOf("_id"  to json(pkColumns.map { row1[it-1 ] }) )
-                                 }+data).toMap())
-                                )
+                                val row1 = jdbcRows(columnNameArray, this);
+                                row1.forEach {row1->
+
+                                    val data = columnNameArray.mapIndexed{index, s ->s to  row1[index]  }
+                                    err.println(
+                                            json ((when(pkColumns.size){
+                                                0->emptyList<Pair <String,*>>()
+                                                1->listOf ("_id" to row1[pkColumns.first()-1 ].toString())
+                                                else -> listOf("_id"  to json(pkColumns.map { row1[it-1 ] }) )
+                                            }+data).toMap())
+                                    )
+                                }
                             }
                         }
                     }
