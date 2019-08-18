@@ -2,4 +2,4 @@
 
 set -fx
 JDIR=$(dirname $0)/../
-exec java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.QueryToFlat} "$@"
+exec java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.JdbcToCouchDbBulkKt} "$@"
