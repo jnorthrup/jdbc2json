@@ -5,11 +5,15 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fnreport.JdbcMacros.jdbcColumnNames
 import com.fnreport.JdbcMacros.jdbcRows
 import com.fnreport.JdbcMacros.jdbcTablePkOrdinalSequence
-import com.fnreport.JdbcMacros.jdbcTablePkMetaPair
+import java.io.IOException
 import java.lang.System.*
+import java.net.HttpURLConnection
+import java.net.URL
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.text.SimpleDateFormat
+import kotlin.system.exitProcess
+import kotlin.text.Charsets.UTF_8
 
 object JdbcToCouchDbBulk {
     val objectMapper = ObjectMapper().apply {
@@ -18,19 +22,17 @@ object JdbcToCouchDbBulk {
     }
 
 
-    val fetchSize = EnvConfig("FETCHSIZE")
-    val useTerse = EnvConfig("TERSE", docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object.")
-    val schemaa = EnvConfig("SCHEMAPATTERN")
-    val catalogg = EnvConfig("CATALOG")
+    val configs = listOf(
+            EnvConfig("FETCHSIZE", docString = "number of rows to fetch from jdbc"),
+            EnvConfig("BULKSIZE", "500", docString = "number of rows to write in bulk"),
+            EnvConfig("BATCHMODE", docString = "ifnotnull"),
+            EnvConfig("TERSE", docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object."),
+            EnvConfig("SCHEMAPATTERN"),
+            EnvConfig("CATALOG"),
+            EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also"),
+            EnvConfig("TYPES", """["TABLE"]""", """array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
+    ).map { it.name to it }.toMap()
 
-    val tablenamePattern = EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also")
-
-    val typesConfig = EnvConfig("TYPES", """["TABLE"]""",
-            """array: Typical types are "TABLE",
-                       "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
-
-    val configs: List<EnvConfig>
-        get() = listOf(useTerse,fetchSize, catalogg, schemaa, tablenamePattern, typesConfig)
 
     fun go(args: Array<out String>) {
         if (args.size < 2) {
@@ -38,9 +40,9 @@ object JdbcToCouchDbBulk {
                     """
                     usage:
                     env vars:
-                    ${configs.joinToString(prefix = "[", postfix = "]", separator = "] [")} 
+                    ${configs.values.joinToString(prefix = "[", postfix = "]", separator = "] [")} 
                     cmdline: 
-                    ${JdbcToCouchDbBulk.javaClass.canonicalName} http://admin:somepassword@0.0.0.0:5984/prefix_ jdbc:mysql://foo 
+                    ${JdbcToCouchDbBulk.javaClass.canonicalName} http://[admin:somepassword]@0.0.0.0:5984/prefix_ jdbc:mysql://foo 
                     """.trimIndent()
             )
             exit(1)
@@ -49,8 +51,10 @@ object JdbcToCouchDbBulk {
         val jdbcUrl = args[1]
         val connection = driver.connect(jdbcUrl, getProperties())
 
-        err.println("driver info for '$jdbcUrl' ${driver.toString()} ")
+        err.println("driver info for '$jdbcUrl' $driver ")
         err.println("connection info: ${connection.clientInfo}")
+        val (fetchSize, catalogg, schemaa, tablenamePattern, typesConfig) = arrayOf("FETCHSIZE", "CATALOG", "SCHEMAPATTERN", "TABLENAMEPATTERN", "TYPES").map { configs[it]!! }
+        val bulkSize = configs["BULKSIZE"]!!.value!!.toInt()
         fetchSize.value?.run { err.println("setting fetchsize to: " + fetchSize.value) }
         val dbMeta = connection.metaData
         val couchprefix = args[0]
@@ -93,18 +97,55 @@ object JdbcToCouchDbBulk {
                                 }
                                 err.println("$viewHeader")
 
-                                val row1 = jdbcRows(columnNameArray, this);
-                                row1.forEach {row1->
+                                val couchTable = couchprefix + tname.toLowerCase()
+                                var couchConn = URL(couchTable).openConnection() as HttpURLConnection
+                                couchConn.requestMethod = "PUT"
+                                couchConn.doOutput = true
+                                couchConn.outputStream.write("".toByteArray())
 
-                                    val data = columnNameArray.mapIndexed{index, s ->s to  row1[index]  }
-                                    err.println(
-                                            json ((when(pkColumns.size){
-                                                0->emptyList<Pair <String,*>>()
-                                                1->listOf ("_id" to row1[pkColumns.first()-1 ].toString())
-                                                else -> listOf("_id"  to json(pkColumns.map { row1[it-1 ] }) )
-                                            }+data).toMap())
-                                    )
-                                }
+                                err.println(couchTable + ": " + couchConn.responseCode to couchConn.responseMessage)
+                                couchConn.disconnect()
+
+                                val row = jdbcRows(columnNameArray, this)
+
+                                row.chunked(bulkSize)
+                                        .forEach { rowChunk ->
+                                            try {
+                                                couchConn = URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
+                                                couchConn.requestMethod = "POST"
+                                                couchConn.setRequestProperty("Content-Type", "application/json")
+                                                couchConn.doInput = true
+                                                couchConn.doOutput = true
+                                            } catch (e: IOException) {
+                                                err.println("" +
+                                                        couchConn.responseCode + " : " + couchConn.responseMessage
+                                                )
+                                                e.printStackTrace()
+                                                exitProcess(1)
+                                            }
+                                            val couchBatch = rowChunk.map { row ->
+                                                columnNameArray.mapIndexed { index, s -> s to row[index] }.let { data ->
+                                                    when (pkColumns.size) {
+                                                        0 -> emptyList<Pair<String, *>>()
+                                                        1 -> listOf("_id" to row[pkColumns.first() - 1].toString())
+                                                        else -> listOf("_id" to json(pkColumns.map { row[it - 1] }))
+                                                    } + data
+                                                }.toMap()
+                                            }
+
+                                            val content = json(mapOf("docs" to couchBatch))
+                                            err.println(content)
+                                            couchConn.outputStream.write(content.toByteArray(UTF_8))
+                                            couchConn.outputStream.close()
+//                                             err.println("${couchConn.url} : ${couchConn.responseCode} : ${couchConn.responseMessage}")
+                                            /* try{
+                                                 err.println(String(couchConn.inputStream.readAllBytes()))
+                                             } catch (e: IOException) {
+
+                                                 e.printStackTrace()
+                                                 exitProcess(1)
+                                             }*/
+                                        }
                             }
                         }
                     }

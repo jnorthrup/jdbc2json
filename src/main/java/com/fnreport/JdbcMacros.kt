@@ -1,14 +1,14 @@
 package com.fnreport
 
-import com.fnreport.JdbcToCouchDbBulk.catalogg
-import com.fnreport.JdbcToCouchDbBulk.schemaa
+
+import com.fnreport.JdbcToCouchDbBulk.configs
 import com.fnreport.jdbcmeta.ColumnMetaColumns
 import com.fnreport.jdbcmeta.PkSeqMeta
 import java.sql.DatabaseMetaData
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 
-object JdbcMacros{
+object JdbcMacros {
     fun jdbcColumnNames(meta: ResultSetMetaData) = (1..meta.columnCount).map { meta.getColumnLabel(it) }
     fun jdbcRows(hdr: Iterable<*>, rs: ResultSet) = resultSequence(rs).map { hdr.mapIndexed { index, _ -> index + 1 }.map { rs.getObject(it) } }
     fun resultSequence(rs: ResultSet) = generateSequence { rs.takeIf { rs.next() } }
@@ -24,9 +24,9 @@ object JdbcMacros{
      */
     fun jdbcTablePkOrdinalSequence(dbMeta: DatabaseMetaData,
                                    tname: String,
-                                   schemaName: String? = schemaa.value,
-                                   catalogName: String? = catalogg.value) =
-            jdbcTablePkColNameSequence(dbMeta, tname, schemaName, catalogName).map { cname -> jdbcColumnNameToOrdinal(dbMeta, catalogName, schemaName, tname, cname) }
+                                   schemaName: String? = configs["SCHEMA"]?.value,
+                                   catalogName: String? = configs["CATALOG"]?.value
+    ) = jdbcTablePkColNameSequence(dbMeta, tname, schemaName, catalogName).map { cname -> jdbcColumnNameToOrdinal(dbMeta, catalogName, schemaName, tname, cname) }
 
     /**
      * provided with a databasemetadata, we get the primaryKeyColumnIndexes
@@ -46,12 +46,18 @@ object JdbcMacros{
      *  </OL>
      *  @return the table's column names
      */
-    fun jdbcTablePkColNameSequence(dbMeta: DatabaseMetaData, tname: String, schemaName: String? = schemaa.value, catalogName: String? = catalogg.value) =
+    fun jdbcTablePkColNameSequence(dbMeta: DatabaseMetaData, tname: String,
+                                   schemaName: String? = configs["SCHEMA"]?.value,
+                                   catalogName: String? = configs["CATALOG"]?.value
+    ) =
             jdbcTablePkMetaPair(dbMeta, tname, schemaName, catalogName)
                     .sortedBy(Pair<Int, String>::first)
                     .map(Pair<Int, String>::second)
 
-    fun jdbcTablePkMetaPair(dbMeta: DatabaseMetaData, tname: String, schemaName: String? = schemaa.value, catalogName: String? = catalogg.value) =
+    fun jdbcTablePkMetaPair(dbMeta: DatabaseMetaData, tname: String,
+                            schemaName: String? = configs["SCHEMA"]?.value,
+                            catalogName: String? = configs["CATALOG"]?.value
+    ) =
             resultSequence(dbMeta.getPrimaryKeys(catalogName, schemaName, tname)).map { it.getInt(PkSeqMeta.KEY_SEQ.ordinal) to it.getString(PkSeqMeta.COLUMN_NAME.ordinal) }
 
 }
