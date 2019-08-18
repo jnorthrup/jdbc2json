@@ -10,7 +10,7 @@ TYPE_NAME String => type name (may be null)
 SELF_REFERENCING_COL_NAME String => name of the designated "identifier" column of a typed table (may be null)
 REF_GENERATION String => specifies how values in SELF_REFERENCING_COL_NAME are created. Values are "SYSTEM", "USER", "DERIVED". (may be null)
 */
-enum class TableMeta {
+enum class TableMeta : JDBCMetaOffset{
     UNUSED,
     TABLE_CAT,// String => table catalog (may be null)
     TABLE_SCHEM,// String => table schema (may be null)

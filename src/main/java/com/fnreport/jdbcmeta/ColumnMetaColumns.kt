@@ -70,7 +70,7 @@ package com.fnreport.jdbcmeta
  * this is the length in bytes. Null is returned for data types where the
  * column size is not applicable.
  */
-enum class ColumnMetaColumns {
+enum class ColumnMetaColumns : JDBCMetaOffset {
     UNUSED,
     TABLE_CAT,
     TABLE_SCHEM,

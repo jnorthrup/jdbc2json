@@ -11,7 +11,7 @@ package com.fnreport.jdbcmeta
  *  <LI><B>PK_NAME</B> String {@code =>} primary key name (may be <code>null</code>)
  *  </OL>
  */
-enum class PkSeqMeta {
+enum class PkSeqMeta : JDBCMetaOffset{
     UNUSED,
     TABLE_CAT,// String => table catalog(may be null)
     TABLE_SCHEM,// String => table schema(may be null)
