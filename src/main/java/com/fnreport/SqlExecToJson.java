@@ -1,9 +1,7 @@
 package com.fnreport;
 
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -13,8 +11,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,12 +27,15 @@ import static java.util.Arrays.*;
  * Date: 11/30/11
  * Time: 12:53 AM
  */
-public class BatchBuild {
+public class SqlExecToJson {
     public static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
     public static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
-    public static final GsonBuilder BUILDER = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
-            FieldNamingPolicy.IDENTITY).setPrettyPrinting();
-    public static final Gson GSON = BUILDER.create();
+//    public static final GsonBuilder BUILDER = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(
+//            FieldNamingPolicy.IDENTITY).setPrettyPrinting();
+    public static final ObjectMapper GSON = new ObjectMapper(){{
+        setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ"));
+//        setPropertyNamingStrategy(PropertyNamingStrategy.)
+}};
     static long counter;
 
     static {
@@ -43,7 +44,7 @@ public class BatchBuild {
 
     static public void main(String... args) {
         if (args.length < 1) {
-            System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n [ASYNC=true] [JSONINPUT=true] {0} name pkname couch_prefix ''jdbc-url''  <sql>   ", BatchBuild.class.getCanonicalName()));
+            System.err.println(MessageFormat.format("convert a query to json (and PUT to url) \n [ASYNC=true] [JSONINPUT=true] {0} name pkname couch_prefix ''jdbc-url''  <sql>   ", SqlExecToJson.class.getCanonicalName()));
             exit(1);
         }
         System.err.println("\"use json rows\" is " + USEJSONINPUT);
@@ -125,15 +126,15 @@ spec=matcher.group(1)+matcher.group(3);
                                     try {
                                         switch (new StringBuilder().append(s.charAt(0)).append(s.charAt(s.length() - 1)).toString()) {
                                             case "[]":
-                                                object = GSON.fromJson(s, List.class);
+                                                object = GSON.readValue(s, List.class);
                                                 break;
                                             case "{}":
-                                                object = GSON.fromJson(s, Map.class);
+                                                object = GSON.readValue(s, Map.class);
                                                 break;
                                             default:
                                                 break;
                                         }
-                                    } catch (JsonSyntaxException e) {
+                                    } catch (Throwable e) {
                                         System.err.println(s);
                                         System.err.println(e.getMessage());
 
@@ -158,7 +159,7 @@ spec=matcher.group(1)+matcher.group(3);
 
                         byte[] bytes = new byte[0];
                         try {
-                            bytes = GSON.toJson(row).getBytes(StandardCharsets.UTF_8);
+                            bytes = GSON.writeValueAsBytes(row);//.getBytes(StandardCharsets.UTF_8);
                         } catch (Exception e) {
 
                             System.err.printf("%s :%s%n", e.getMessage(), deepToString(asList(row).toArray()));

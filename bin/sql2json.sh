@@ -2,4 +2,4 @@
 
 set -fx
 JDIR=$(dirname $0)/../
-exec java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.BatchBuild} ${@}
+exec java  -classpath "$JDIR/target/*:$JDIR/target/lib/*"  ${EXECMAIN:=com.fnreport.SqlExecToJson} "${@}"

@@ -61,9 +61,8 @@ class ReiterateDb {
                         couchms = measureTimeMillis {
                             val urlConnection: HttpURLConnection = URL(couchPrefix + '/' + couchDbName + '/' + "_all_docs?include_docs=true").openConnection() as HttpURLConnection
                             val couchRes = objectMapper.readValue(InputStreamReader(urlConnection.inputStream), Map::class.java)
-
-                            rows = ((couchRes["rows"] as List<Map<String, Any?>>)).filter { it["id"].toString().startsWith("_").not() }
-                                    .map { rowMap -> rowMap["doc"] as Map<String, Any?> }.map { docMap: Map<String, Any?> -> docMap["_id"].toString() to (docMap["_rev"].toString() to docMap.filter { (key, vl) -> !key.startsWith("_") && vl != null }.toSortedMap()) }.toMap()
+                            rows = (couchRes["rows"] as List<Map<String, *>>).filter { it["id"].toString().startsWith("_").not() }
+                                    .map { rowMap -> rowMap["doc"] as Map<String, *> }.map { docMap: Map<String, Any?> -> docMap["_id"].toString() to (docMap["_rev"].toString() to docMap.filter { (key, vl) -> !key.startsWith("_") && vl != null }.toSortedMap()) }.toMap()
                         }
                     } catch (e: Throwable) {
                         System.err.println(e.localizedMessage)

@@ -69,18 +69,18 @@ class QueryToFlat {
 
 
             var cwidths = Array(0) { 0 }
-            var cnames = Array(0) { "" }
+            var cnames: Array<String>
             var cmax = -1
             val cr = "\n".toByteArray()
 
             try {
-                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, rs ->
+                generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, cursorRow ->
                     if (rownum == 0) {
-                        cwidths = (1..rs.metaData.columnCount).map {
-                            rs.metaData.getColumnDisplaySize(it)
+                        cwidths = (1..cursorRow.metaData.columnCount).map {
+                            cursorRow.metaData.getColumnDisplaySize(it)
                         }.toTypedArray()
-                        cnames = (1..rs.metaData.columnCount).map {
-                            rs.metaData.getColumnName(it)
+                        cnames = (1..cursorRow.metaData.columnCount).map {
+                            cursorRow.metaData.getColumnName(it)
                         }.toTypedArray()
 
                         var accum = 0
@@ -94,9 +94,9 @@ class QueryToFlat {
                             colspecs=${cwidths.map { i: Int -> accum to accum + i.also { accum += i } }})""".trimIndent())
                     }
 
-                    (1..rs.metaData.columnCount).forEachIndexed { i, ci ->
+                    (1..cursorRow.metaData.columnCount).forEachIndexed { i, ci ->
                         val currentColWidth = cwidths[i]
-                        val oval = rs.getString(ci) ?: ""
+                        val oval = cursorRow.getString(ci) ?: ""
 
                         val outbuf = oval.toByteArray()
                         val csz = outbuf.size

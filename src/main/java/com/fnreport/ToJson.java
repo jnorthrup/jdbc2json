@@ -1,14 +1,14 @@
 package com.fnreport;
 
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
-import java.io.OutputStream;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.sql.*;
+import java.sql.Array;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,8 +21,6 @@ import static java.lang.System.exit;
  * Time: 12:53 AM
  */
 public class ToJson {
-    static final GsonBuilder BUILDER =
-            new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setFieldNamingPolicy(FieldNamingPolicy.IDENTITY).setPrettyPrinting();
     static final boolean USEJSONINPUT = Objects.equals(System.getenv("JSONINPUT"), "true");
     static final boolean ASYNC = Objects.equals(System.getenv("ASYNC"), "true");
     static long counter;
@@ -36,50 +34,51 @@ public class ToJson {
             System.err.println("copy all tables to json PUT\n\t  [ASYNC=true]  [JSONINPUT=true] " + ToJson.class.getCanonicalName() + " dbhost dbname user password couchprefix [jdbc:url:etc]");
             exit(1);
         }
-        Driver DRIVER;
 
-        String jdbcurl = args.length > 5 ? args[5] : "jdbc:mysql://" + args[0] +
+        var jdbcurl = args.length > 5 ? args[5] : "jdbc:mysql://" + args[0] +
                 "/" + args[1] +
                 "?zeroDateTimeBehavior=convertToNull&user=" + args[2] +
                 "&password=" + args[3];
-        DRIVER = DriverManager.getDriver(jdbcurl);
+        var DRIVER = DriverManager.getDriver(jdbcurl);
 
         System.err.println("\"use json rows\" is " + USEJSONINPUT);
         System.err.println("\"rest.async\" is " + ASYNC);
-        Connection connect = DRIVER.connect(jdbcurl, new Properties());
-        DatabaseMetaData metaData = connect.getMetaData();
+        var connect = DRIVER.connect(jdbcurl, new Properties());
+        var metaData = connect.getMetaData();
 
-        ResultSet sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
+        var sourceTables = metaData.getTables(null, null, null, new String[]{"TABLE"});
 
-        String couchprefix = args[4];
+        var couchprefix = args[4];
 
-        List<String> tables = new ArrayList<String>();
-        int c = 1;
+        var tables = new ArrayList<String>();
+        var c = 1;
         while (sourceTables.next()) {
-            String table_schem = sourceTables.getString("TABLE_SCHEM");
-            String table_name = sourceTables.getString("TABLE_NAME");
+            var table_schem = sourceTables.getString("TABLE_SCHEM");
+            var table_name = sourceTables.getString("TABLE_NAME");
             if (table_schem != null && !table_schem.isEmpty()) {
                 table_name = table_schem + '.' + table_name;
             }
             tables.add(table_name);
         }
-        Gson gson = BUILDER.create();//new GsonBuilder().setPrettyPrinting().create();
-        for (String tablename : tables) {
-            String[] realm = tablename.split("\\.", 2);
-            String name = realm.length > 1 ? realm[1] : tablename;
-            Statement statement = connect.createStatement();
+        var gson = new ObjectMapper() {{
+            setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ"));
+        }};
+        for (var tablename : tables) {
+            var realm = tablename.split("\\.", 2);
+            var name = realm.length > 1 ? realm[1] : tablename;
+            var statement = connect.createStatement();
 
-            try (ResultSet resultSet = statement.executeQuery("select count(*) from " + tablename)) {
+            try (var resultSet = statement.executeQuery("select count(*) from " + tablename)) {
                 resultSet.next();
-                final long aLong = resultSet.getLong(1);
+                final var aLong = resultSet.getLong(1);
                 System.err.println("table: " + tablename + " " + aLong);
             }
 
-            try (ResultSet resultSet = statement.executeQuery("select * from " + tablename)) {
-                ResultSetMetaData metaData1 = resultSet.getMetaData();
-                int columnCount = metaData1.getColumnCount();
+            try (var resultSet = statement.executeQuery("select * from " + tablename)) {
+                var metaData1 = resultSet.getMetaData();
+                var columnCount = metaData1.getColumnCount();
                 String pk = null;
-                try (ResultSet primaryKeys = metaData.getPrimaryKeys(null, realm.length > 1 ? realm[0] : null, name)) {
+                try (var primaryKeys = metaData.getPrimaryKeys(null, realm.length > 1 ? realm[0] : null, name)) {
                     primaryKeys.next();
                     pk = primaryKeys.getString(4);
                 } catch (SQLException e) {
@@ -89,24 +88,24 @@ public class ToJson {
                     throw new Error("refine");
 */
                 }
-                boolean first = true;
+                var first = true;
                 Map<Integer, AtomicInteger> responses = new LinkedHashMap<>();
-                String tableAccessUrl = couchprefix + name.toLowerCase() + "/";
+                var tableAccessUrl = couchprefix + name.toLowerCase() + "/";
 
                 Map<String, Integer> tablecreation = Collections.EMPTY_MAP;
                 while (resultSet.next()) {
                     if (first) {
                         first = false;
-                        String dest = couchprefix + name.toLowerCase().replaceAll("\\W+", "_");
-                        HttpURLConnection httpCon = (HttpURLConnection) new URL(dest).openConnection();
+                        var dest = couchprefix + name.toLowerCase().replaceAll("\\W+", "_");
+                        var httpCon = (HttpURLConnection) new URL(dest).openConnection();
 
-                        byte[] utf8s = "{}".getBytes();
+                        var utf8s = "{}".getBytes();
                         httpCon.setFixedLengthStreamingMode(utf8s.length);
                         httpCon.setRequestMethod("PUT");
                         httpCon.setUseCaches(true);
                         httpCon.setDoOutput(true);
 
-                        try (OutputStream outputStream = httpCon.getOutputStream()) {
+                        try (var outputStream = httpCon.getOutputStream()) {
                             outputStream.write(utf8s);
                         }
                         //sync the table creation
@@ -122,21 +121,21 @@ public class ToJson {
                     }
                     Map<String, Object> row = new LinkedHashMap<>();
 
-                    for (int i = 1; i < columnCount + 1; ++i) {
-                        String columnType = metaData1.getColumnClassName(i);
-                        String columnName = metaData1.getColumnName(i);
+                    for (var i = 1; i < columnCount + 1; ++i) {
+                        var columnType = metaData1.getColumnClassName(i);
+                        var columnName = metaData1.getColumnName(i);
                         try {
-                            Object object = resultSet.getObject(i);
+                            var object = resultSet.getObject(i);
 
                             if (object instanceof String && USEJSONINPUT) {
-                                String s = String.valueOf(object).trim();
+                                var s = String.valueOf(object).trim();
                                 if (!s.isBlank())
                                     switch (new StringBuilder().append(s.charAt(0)).append(s.charAt(s.length() - 1)).toString()) {
                                         case "[]":
-                                            object = gson.fromJson(s, Array.class);
+                                            object = gson.readValue(s, Array.class);
                                             break;
                                         case "{}":
-                                            object = gson.fromJson(s, Map.class);
+                                            object = gson.readValue(s, Map.class);
                                             break;
                                         default:
                                             break;
@@ -150,22 +149,22 @@ public class ToJson {
                     }
 
 
-                    String str = pk == null ? Long.toHexString(++counter | 0x1000000000L).substring(1) : resultSet.getString(pk);
+                    var str = pk == null ? Long.toHexString(++counter | 0x1000000000L).substring(1) : resultSet.getString(pk);
                     HttpURLConnection httpCon = null;
                     try {
                         httpCon = (HttpURLConnection) new URL(tableAccessUrl + str).openConnection();
-                        byte[] utf8s = gson.toJson(row).getBytes(StandardCharsets.UTF_8);
+                        var utf8s = gson.writeValueAsBytes(row);
                         httpCon.setFixedLengthStreamingMode(utf8s.length);
                         httpCon.setRequestMethod("PUT");
                         httpCon.setUseCaches(true);
                         httpCon.setDoOutput(true);
-                        try (OutputStream outputStream = httpCon.getOutputStream()) {
+                        try (var outputStream = httpCon.getOutputStream()) {
                             outputStream.write(utf8s);
                             outputStream.flush();
                         }
                     } finally {
                         if (!ASYNC) {
-                            int responseCode = httpCon.getResponseCode();
+                            var responseCode = httpCon.getResponseCode();
                             responses.computeIfAbsent(responseCode, initialValue -> new AtomicInteger(0)).incrementAndGet();
                         }
                         httpCon.disconnect();

@@ -78,8 +78,7 @@ object JdbcMacros {
             }.toMap()
 
 
-    fun connectToJdbcUrl(args: Array<out String>, properties: Properties? = getProperties()): Pair<Connection, DatabaseMetaData> {
-        val jdbcUrl = args[1]
+    fun connectToJdbcUrl(jdbcUrl: String, properties: Properties? = getProperties()): Pair<Connection, DatabaseMetaData> {
         val driver = DriverManager.getDriver(jdbcUrl)
         val connection = driver.connect(jdbcUrl, properties)
         err.println("driver info for '$jdbcUrl' $driver ")
