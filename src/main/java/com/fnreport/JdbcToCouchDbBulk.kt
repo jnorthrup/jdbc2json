@@ -121,7 +121,7 @@ object JdbcToCouchDbBulk {
                                     val terseViewsString = json(mapOf("_id" to "_design/meta",
                                             "views" to mapOf(
                                                     "asMap" to mapOf(
-                                                            "map" to json(viewCode)
+                                                            "map" to  (viewCode)
                                                     )
                                             ),
                                             "language" to "javascript"))
