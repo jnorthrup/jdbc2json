@@ -4,11 +4,13 @@ package com.fnreport
 import com.fnreport.JdbcToCouchDbBulk.configs
 import com.fnreport.jdbcmeta.ColumnMetaColumns
 import com.fnreport.jdbcmeta.PkSeqMeta
-import java.sql.DatabaseMetaData
-import java.sql.ResultSet
-import java.sql.ResultSetMetaData
+import java.lang.System.err
+import java.lang.System.getProperties
+import java.sql.*
+import java.util.*
 
 object JdbcMacros {
+    infix fun <T> json(x: T) = JdbcToCouchDbBulk.objectMapper.writeValueAsString(x)
     fun jdbcColumnNames(meta: ResultSetMetaData) = (1..meta.columnCount).map { meta.getColumnLabel(it) }
     fun jdbcRows(hdr: Iterable<*>, rs: ResultSet) = resultSequence(rs).map { hdr.mapIndexed { index, _ -> index + 1 }.map { rs.getObject(it) } }
     fun resultSequence(rs: ResultSet) = generateSequence { rs.takeIf { rs.next() } }
@@ -49,15 +51,40 @@ object JdbcMacros {
     fun jdbcTablePkColNameSequence(dbMeta: DatabaseMetaData, tname: String,
                                    schemaName: String? = configs["SCHEMA"]?.value,
                                    catalogName: String? = configs["CATALOG"]?.value
-    ) =
-            jdbcTablePkMetaPair(dbMeta, tname, schemaName, catalogName)
-                    .sortedBy(Pair<Int, String>::first)
-                    .map(Pair<Int, String>::second)
+    ) = jdbcTablePkMetaPair(dbMeta, tname, schemaName, catalogName)
+            .sortedBy(Pair<Int, String>::first)
+            .map(Pair<Int, String>::second)
 
     fun jdbcTablePkMetaPair(dbMeta: DatabaseMetaData, tname: String,
                             schemaName: String? = configs["SCHEMA"]?.value,
                             catalogName: String? = configs["CATALOG"]?.value
-    ) =
-            resultSequence(dbMeta.getPrimaryKeys(catalogName, schemaName, tname)).map { it.getInt(PkSeqMeta.KEY_SEQ.ordinal) to it.getString(PkSeqMeta.COLUMN_NAME.ordinal) }
+    ) = resultSequence(dbMeta.getPrimaryKeys(catalogName, schemaName, tname)).map { it.getInt(PkSeqMeta.KEY_SEQ.ordinal) to it.getString(PkSeqMeta.COLUMN_NAME.ordinal) }
 
+    fun rowAsTuples(pkColumns: List<Int>, row: List<Any>, pkName: String = "_id") = row.let { data ->
+        when (pkColumns.size) {
+            0 -> emptyList<Pair<String, *>>()
+            1 -> listOf(pkName to row[pkColumns.first() - 1].toString())
+            else -> listOf(pkName to json(pkColumns.map { row[it - 1] }))
+        } + listOf("row" to data)
+    }
+
+    fun rowAsMap(columnNameArray: List<String>, pkColumns: List<Int>, row: List<*>, pkName: String = "_id") =
+            columnNameArray.mapIndexed { index, s -> s to row[index] }.let { data ->
+                when (pkColumns.size) {
+                    0 -> emptyList<Pair<String, *>>()
+                    1 -> listOf(pkName to row[pkColumns.first() - 1].toString())
+                    else -> listOf(pkName to json(pkColumns.map { row[it - 1] }))
+                } + data
+            }.toMap()
+
+
+    fun connectToJdbcUrl(args: Array<out String>, properties: Properties? = getProperties()): Pair<Connection, DatabaseMetaData> {
+        val jdbcUrl = args[1]
+        val driver = DriverManager.getDriver(jdbcUrl)
+        val connection = driver.connect(jdbcUrl, properties)
+        err.println("driver info for '$jdbcUrl' $driver ")
+        err.println("connection info: ${connection.clientInfo}")
+        val dbMeta = connection.metaData
+        return Pair(connection, dbMeta)
+    }
 }
