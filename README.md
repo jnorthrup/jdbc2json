@@ -18,7 +18,7 @@ run from project dir using scripts in bin:
   * [x] reify json strings
   * [X] bulk inserts
   * [X] remove gson and use Jackson
-  * [X] review kotlin serializers
+  * [ ] review kotlin serializers
   * [X] *sort of* configurable Numerics options like squelching ".0" 
   
  

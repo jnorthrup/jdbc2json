@@ -2,16 +2,10 @@ package com.fnreport
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
-import com.fnreport.JdbcMacros.connectToJdbcUrl
-import com.fnreport.JdbcMacros.jdbcColumnNames
-import com.fnreport.JdbcMacros.jdbcRows
-import com.fnreport.JdbcMacros.jdbcTablePkOrdinalSequence
-import com.fnreport.JdbcMacros.json
-import com.fnreport.JdbcMacros.rowAsMap
-import com.fnreport.JdbcMacros.rowAsTuples
 import org.intellij.lang.annotations.Language
 import java.io.IOException
-import java.lang.System.*
+import java.lang.System.err
+import java.lang.System.exit
 import java.net.HttpURLConnection
 import java.net.URL
 import java.sql.ResultSet
@@ -20,10 +14,6 @@ import kotlin.system.exitProcess
 import kotlin.text.Charsets.UTF_8
 
 object JdbcToCouchDbBulk {
-    public val objectMapper = ObjectMapper().apply {
-        dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
-        this.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
-    }
 
 
     val configs = listOf(
@@ -63,13 +53,10 @@ object JdbcToCouchDbBulk {
         listOf(catalogg, schemaa, tablenamePattern).let { (cname, sname, tpat) ->
             val typs = typesConfig?.let { objectMapper.readValue(it, Array<String>::class.java) }
             val catalogResultSet = dbMeta.getTables(cname, sname, tpat, typs)
-            err.println(jdbcColumnNames(catalogResultSet.metaData).toString())
-            val catalogRows = jdbcRows(jdbcColumnNames(catalogResultSet.metaData), catalogResultSet)
+            err.println(catalogResultSet.metaData.jdbcColumnNames.toString())
+            val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
 
-            catalogRows.forEach {
-                val fullName = it.dropLast(2)
-                val tname = fullName.last().toString()
-                val pkColumns = jdbcTablePkOrdinalSequence(dbMeta, tname).toList()
+            catalogRows.map(dbMeta::jdbcEntity).forEach { (_, tname, pkColumns) ->
                 val statement = connection.createStatement()
 
                 if (statement.execute("select count(*) from $tname")) {
@@ -79,7 +66,7 @@ object JdbcToCouchDbBulk {
                         with(statement) {
                             execute("select * from $tname")
                             with(resultSet) {
-                                val columnNameArray by lazy { metaData.let(::jdbcColumnNames) }
+                                val columnNameArray by lazy { metaData.jdbcColumnNames }
                                 val viewHeader by lazy {
                                     val id = pkColumns.takeUnless(List<Int>::isEmpty)?.let {
                                         try {
@@ -121,7 +108,7 @@ object JdbcToCouchDbBulk {
                                     val terseViewsString = json(mapOf("_id" to "_design/meta",
                                             "views" to mapOf(
                                                     "asMap" to mapOf(
-                                                            "map" to  (viewCode)
+                                                            "map" to (viewCode)
                                                     )
                                             ),
                                             "language" to "javascript"))
@@ -132,7 +119,7 @@ object JdbcToCouchDbBulk {
                                     err.println(couchTable + ": " + couchConn.responseCode to couchConn.responseMessage)
                                     couchConn.disconnect()
                                 }
-                                val row = jdbcRows(columnNameArray, this)
+                                val row = this.jdbcRows(columnNameArray)
 
                                 row.chunked(bulkSize).forEach { rowChunk ->
                                     try {
