@@ -2,6 +2,8 @@ package com.fnreport
 
 import com.hazelcast.config.Config
 import com.hazelcast.core.Hazelcast
+import org.apache.commons.codec.digest.DigestUtils
+import java.sql.ResultSetMetaData
 
 object JdbcToHazelCast {
 
@@ -41,20 +43,20 @@ object JdbcToHazelCast {
 
         val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
 
-        val entities = catalogRows.map(dbMeta::jdbcEntity)
+        val entities = catalogRows.map(dbMeta::jdbcEntity).map { (hier, tname, pkColumnIndexes) -> DbEntity(hier, tname, pkColumnIndexes) }
 
         val hz = Hazelcast.getOrCreateHazelcastInstance(Config(hzName))
 
-        val destination = hz.getMap<String, List<String>>((  jdbcUrl.replace(Regex("(user|username|pass|password)=[^;]+[;]?"),"$1=...;") ).toString())
-        val toMap = entities.map { (hier, tname, pk) ->
-            tname to hier
-        }.toMap(                 destination          )
 
-
-
-
+        val cleanJdbcUrl = jdbcUrl.replace(Regex("(user|username|pass|password)=[^;]+[;]?"), "$1=...;")
+        val catalogMap = entities.map { dbE ->
+            dbE.tname to Pair(dbE, hz.getReliableTopic<List<List<Any>>>(DigestUtils.sha1Hex(cleanJdbcUrl + dbE.tname)).apply {
+                addMessageListener {
+                    dbE.localStorage(jdbcUrl).toList()
+                }
+            })
+        }.toMap(hz.getMap((cleanJdbcUrl)))
     }
-
 
     private fun printOptions() {
         System.err.println(
@@ -73,4 +75,18 @@ object JdbcToHazelCast {
 
 fun main(vararg args: String) {
     JdbcToHazelCast.go(args)
+}
+
+data class DbEntity( val hierarchy: List<String>, val tname: String, val pkColumnIndexes: List<Int>) {
+
+
+    private lateinit var rsMetadata: ResultSetMetaData
+    private  var cached: Sequence<List<Any>>?=null
+
+    fun localStorage(jdbcUrl: String)  =
+            this.cached ?:connectToJdbcUrl(jdbcUrl).let { (con, _) ->
+                 val tableScan = con.tableScan(tname)
+                rsMetadata=tableScan.first
+                tableScan.second
+            }.also { cached=it }
 }

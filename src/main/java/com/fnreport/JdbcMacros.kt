@@ -13,19 +13,19 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 
-
 val objectMapper = ObjectMapper().apply {
     dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
     this.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
 }
-fun DatabaseMetaData.jdbcEntity(catalogEntry: List<Any>): Triple<List<String>, String, List<Int>> {
-    val hierarchy = catalogEntry.dropLast(2).map(Any::toString)
-    val tname = hierarchy.last()
-    getColumns(hierarchy[0], hierarchy[1], tname, null).jdbcRows(ColumnMetaColumns.values())
-    val pkColumns = jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList<Int>()
 
-    return Triple(hierarchy, tname, pkColumns)
-}
+fun DatabaseMetaData.jdbcEntity(catalogEntry: List<Any>) =
+        (catalogEntry.dropLast(2).map(Any::toString)).let { hierarchy ->
+            hierarchy.last().let { tname ->
+                getColumns(hierarchy[0], hierarchy[1], tname, null).jdbcRows(ColumnMetaColumns.values())
+                DbEntity(hierarchy, tname, jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList())
+            }
+        }
+
 
 /**
  * provided with a databasemetadata, we get the primaryKeyColumnIndexes
@@ -40,13 +40,23 @@ fun DatabaseMetaData.jdbcTablePkOrdinals(catalogName: String?,
         jdbcTablePkColNameSequence(this, tname, schemaName, catalogName).map { cname -> this.jdbcColumnNameToOrdinal(catalogName, schemaName, tname, cname) }
 
 val ResultSetMetaData.jdbcColumnNames get() = (1..columnCount).map { getColumnLabel(it) }
-fun <T> json(x: T) =  objectMapper.writeValueAsString(x)
+fun <T> json(x: T) = objectMapper.writeValueAsString(x)
 fun ResultSet.jdbcRows(hdr: List<*>) = this.resultSequence().map { hdr.mapIndexed { index, _ -> index + 1 }.map(this::getObject) }
 fun ResultSet.jdbcRows(hdr: Array<*>) = this.jdbcRows(arrayListOf(hdr))
 fun ResultSet.resultSequence() = generateSequence { takeIf { next() } }
 fun DatabaseMetaData.jdbcColumnNameToOrdinal(cat: String?, schem: String?, tname: String, cname: String) =
         getColumns(cat, schem, tname, cname).also { it.next() }.getInt(ColumnMetaColumns.ORDINAL_POSITION.ordinal)
 
+fun Connection.tableScan(tname: String): Pair<ResultSetMetaData, Sequence<List<Any>>> {
+    val statement = createStatement()
+    statement.execute("select * from $tname")
+    val resultSet = statement.resultSet
+    val rsMetadata = resultSet.metaData
+
+
+
+    return rsMetadata to resultSet.jdbcRows(rsMetadata.jdbcColumnNames)
+}
 
 /**
  * provided with a databasemetadata, we get the primaryKeyColumnIndexes
