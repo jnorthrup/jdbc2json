@@ -18,13 +18,20 @@ val objectMapper = ObjectMapper().apply {
     this.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
 }
 
-fun DatabaseMetaData.jdbcEntity(catalogEntry: List<Any>) =
-        (catalogEntry.dropLast(2).map(Any::toString)).let { hierarchy ->
-            hierarchy.last().let { tname ->
-                getColumns(hierarchy[0], hierarchy[1], tname, null).jdbcRows(ColumnMetaColumns.values())
-                DbEntity(hierarchy, tname, jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList())
-            }
+fun DatabaseMetaData.jdbcEntity(catalogEntry: List<Any>): DbEntity {
+    val catalogEntry1 = catalogEntry
+    val dropLast = catalogEntry1!!.slice(0..3)
+    val map = dropLast.map{ it?.toString()}
+    return map!!.let{ hierarchy ->
+        val last = hierarchy.last()
+        last.let { tname ->
+            val columns = getColumns(hierarchy[0], hierarchy[1], tname, null)
+            val hdr = ColumnMetaColumns.values()
+            columns.jdbcRows(hdr)
+            DbEntity(hierarchy, tname, jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList())
         }
+    }
+}
 
 
 /**

@@ -2,6 +2,10 @@ package com.fnreport
 
 import com.hazelcast.config.Config
 import com.hazelcast.core.Hazelcast
+import com.hazelcast.nio.serialization.SerializableByConvention
+import kotlinx.serialization.ContextualSerialization
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.apache.commons.codec.digest.DigestUtils
 import java.sql.ResultSetMetaData
 
@@ -28,7 +32,7 @@ object JdbcToHazelCast {
 
         val hzName = configs["HAZELCAST"]!!.value
 
-        val jdbcUrl = args[1]
+        val jdbcUrl = args[0]
         val (connection, dbMeta) = connectToJdbcUrl(jdbcUrl)
 
         val (fetchSize,
@@ -43,19 +47,22 @@ object JdbcToHazelCast {
 
         val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
 
-        val entities = catalogRows.map(dbMeta::jdbcEntity).map { (hier, tname, pkColumnIndexes) -> DbEntity(hier, tname, pkColumnIndexes) }
+        val entities = catalogRows.map(dbMeta::jdbcEntity)
 
         val hz = Hazelcast.getOrCreateHazelcastInstance(Config(hzName))
 
 
         val cleanJdbcUrl = jdbcUrl.replace(Regex("(user|username|pass|password)=[^;]+[;]?"), "$1=...;")
-        val catalogMap = entities.map { dbE ->
-            dbE.tname to Pair(dbE, hz.getReliableTopic<List<List<Any>>>(DigestUtils.sha1Hex(cleanJdbcUrl + dbE.tname)).apply {
+
+        entities.map { dbE ->
+            val topic = hz.getTopic<List<List<Any>>>("${DigestUtils.sha1Hex(cleanJdbcUrl)}/${dbE.tname}").apply {
                 addMessageListener {
-                    dbE.localStorage(jdbcUrl).toList()
+                    DbEntity.localStorage(dbE, jdbcUrl).toList()
                 }
-            })
-        }.toMap(hz.getMap((cleanJdbcUrl)))
+            }
+            dbE.tname to arrayOf(dbE.turd, topic.getName()
+            )
+        }.toMap(hz.getMap(cleanJdbcUrl))
     }
 
     private fun printOptions() {
@@ -65,7 +72,7 @@ object JdbcToHazelCast {
                         env vars:
                         ${configs.values.joinToString(prefix = "[", postfix = "]", separator = "] [")} 
                         cmdline: 
-                        ${JdbcToHazelCast.javaClass.canonicalName}   jdbc:mysql://foo 
+                        ${JdbcToHazelCast.javaClass.canonicalName}   jdbc:mysql://foo ...[]
                         """.trimIndent()
         )
         System.exit(1)
@@ -77,16 +84,20 @@ fun main(vararg args: String) {
     JdbcToHazelCast.go(args)
 }
 
-data class DbEntity( val hierarchy: List<String>, val tname: String, val pkColumnIndexes: List<Int>) {
+data class DbEntity(val hierarchy: List<String>, val tname: String, val pkColumnIndexes: List<Int>) {
 
 
+    val turd get() = Triple(hierarchy, tname, pkColumnIndexes)
     private lateinit var rsMetadata: ResultSetMetaData
-    private  var cached: Sequence<List<Any>>?=null
 
-    fun localStorage(jdbcUrl: String)  =
-            this.cached ?:connectToJdbcUrl(jdbcUrl).let { (con, _) ->
-                 val tableScan = con.tableScan(tname)
-                rsMetadata=tableScan.first
-                tableScan.second
-            }.also { cached=it }
+    private var cached: Sequence<List<Any>>? = null
+
+    companion object {
+        fun localStorage(dbEntity: DbEntity, jdbcUrl: String): Sequence<List<Any>> =
+                dbEntity.cached ?: connectToJdbcUrl(jdbcUrl).let { (con, _) ->
+                    val tableScan = con.tableScan(dbEntity.tname)
+                    dbEntity.rsMetadata = tableScan.first
+                    tableScan.second
+                }.also { dbEntity.cached = it }
+    }
 }

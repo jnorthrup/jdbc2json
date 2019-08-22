@@ -56,31 +56,31 @@ object JdbcToCouchDbBulk {
             err.println(catalogResultSet.metaData.jdbcColumnNames.toString())
             val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
 
-            catalogRows.map(dbMeta::jdbcEntity).forEach { (_, tname, pkColumns) ->
+            catalogRows.map(dbMeta::jdbcEntity).forEach { e ->
                 val statement = connection.createStatement()
 
-                if (statement.execute("select count(*) from $tname")) {
+                if (statement.execute("select count(*) from ${e.tname}")) {
                     val rowCount = statement.resultSet?.takeIf(ResultSet::next)?.getLong(1) ?: 0
                     if (rowCount > 0) {
                         fetchSize?.run { statement.fetchSize = fetchSize.toInt() }
                         with(statement) {
-                            execute("select * from $tname")
+                            execute("select * from ${e.tname}")
                             with(resultSet) {
                                 val columnNameArray by lazy { metaData.jdbcColumnNames }
                                 val viewHeader by lazy {
-                                    val id = pkColumns.takeUnless(List<Int>::isEmpty)?.let {
+                                    val id = e.pkColumnIndexes.takeUnless(List<Int>::isEmpty)?.let {
                                         try {
-                                            "${json(pkColumns.map { columnNameArray[it - 1] })}"
+                                            "${json(e.pkColumnIndexes.map { i -> columnNameArray[i - 1] })}"
                                         } catch (e: IndexOutOfBoundsException) {
                                             e.printStackTrace()
                                         }
                                     } ?: "auto"
-                                    "for tname: $tname rows: $rowCount, pkeys: ${pkColumns.size}/${pkColumns.toList()} columns: $columnNameArray  id: $id"
+                                    "for tname: ${e.tname} rows: $rowCount, pkeys: ${e.pkColumnIndexes.size}/${e.pkColumnIndexes.toList()} columns: $columnNameArray  id: $id"
 
                                 }
                                 err.println("$viewHeader")
 
-                                val couchTable = couchprefix + tname.toLowerCase()
+                                val couchTable = couchprefix + e.tname.toLowerCase()
                                 var couchConn = URL(couchTable).openConnection() as HttpURLConnection
                                 couchConn.requestMethod = "PUT"
                                 couchConn.setRequestProperty("Content-Type", "application/json")
@@ -96,14 +96,14 @@ object JdbcToCouchDbBulk {
                                     couchConn.doOutput = true
                                     @Language("JavaScript") val viewCode = """
                                         function (doc) {
-                                                        var pkeys = ${json(pkColumns)};
+                                                        var pkeys = ${json(e.pkColumnIndexes)};
                                                         var columns = ${json(columnNameArray)};
                                                         var e = {}; 
                                                     
                                                         var row = doc.row;
                                                         var length = row.length;
                                                         for (var i = 0; i < length; i++) e[columns[i]] = row[i];
-                                                        emit(${if (pkColumns.size < 2) "doc._id" else "JSON.parse(doc._id)"}, e)
+                                                        emit(${if (e.pkColumnIndexes.size < 2) "doc._id" else "JSON.parse(doc._id)"}, e)
                                                     }""".trimIndent()
                                     val terseViewsString = json(mapOf("_id" to "_design/meta",
                                             "views" to mapOf(
@@ -138,9 +138,9 @@ object JdbcToCouchDbBulk {
 
                                     couchConn.outputStream.write(json(mapOf("docs" to rowChunk.map { row ->
                                         if (!terse)
-                                            rowAsMap(columnNameArray, pkColumns, row)
+                                            rowAsMap(columnNameArray, e.pkColumnIndexes, row)
                                         else
-                                            rowAsTuples(pkColumns, row).toMap()
+                                            rowAsTuples(e.pkColumnIndexes, row).toMap()
                                     })).toByteArray(UTF_8))
                                     couchConn.outputStream.close()
                                     err.println("${couchConn.url} : ${couchConn.responseCode} : ${couchConn.responseMessage}")
