@@ -21,7 +21,7 @@ object JdbcToHazelCast {
             EnvConfig("CATALOG"),
             EnvConfig("HAZELCAST", (System.currentTimeMillis()).toString()),
             EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also"),
-            EnvConfig("TYPES", """["TABLE"]""", """array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
+            EnvConfig("TYPES", """["TABLES"]""", """array: Typical types are "TABLES", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
     ).map { it.name to it }.toMap()
 
 
