@@ -10,8 +10,6 @@ import org.apache.commons.codec.digest.DigestUtils
 import java.sql.ResultSetMetaData
 
 object JdbcToHazelCast {
-
-
     val configs = listOf(
             EnvConfig("FETCHSIZE", docString = "number of rows to fetch from jdbc"),
             EnvConfig("BULKSIZE", "500", docString = "number of rows to write in bulk"),
