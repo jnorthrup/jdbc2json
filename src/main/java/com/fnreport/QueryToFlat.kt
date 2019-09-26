@@ -93,7 +93,8 @@ class QueryToFlat {
                             d1=pd.read_fwf('$ofile', 
                             names=d1names, 
                             colspecs=${cwidths.map { i: Int -> accum to accum + i.also { accum += i } }})
-                            for i in d1names:print( (i,len( d1[i].unique() )) )
+                            for i in d1names: print( (i,len( d1[i].unique() )) )
+                            
                             d1.to_csv('${ofile.replace(Regex("\\.fwf$"), "") + ".csv"}')
                             """.trimIndent())
                     }
