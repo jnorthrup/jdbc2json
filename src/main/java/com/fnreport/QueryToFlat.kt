@@ -87,11 +87,15 @@ class QueryToFlat {
                         cmax = cwidths.max()!!
                         val ofile = System.getenv("OUTPUT") ?: "fn"
                         System.err.println("""
-                            #some sample pandas code
+                            # some sample pandas code
                             import pandas as pd;
+                            d1names=${cnames.map { "'$it'" }}
                             d1=pd.read_fwf('$ofile', 
-                            names=${cnames.map { "'$it'" }},
-                            colspecs=${cwidths.map { i: Int -> accum to accum + i.also { accum += i } }})""".trimIndent())
+                            names=d1names, 
+                            colspecs=${cwidths.map { i: Int -> accum to accum + i.also { accum += i } }})
+                            for i in d1names:print( (i,len( d1[i].unique() )) )
+                            d1.to_csv('${ofile.replace(Regex("\\.fwf$"), "") + ".csv"}')
+                            """.trimIndent())
                     }
 
                     (1..cursorRow.metaData.columnCount).forEachIndexed { i, ci ->
