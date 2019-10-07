@@ -40,7 +40,7 @@ class QueryToFlat {
             val DRIVER = DriverManager.getDriver(jdbcUrl)
             val conn = DRIVER.connect(jdbcUrl, System.getProperties())
             val maxlen: Int? = System.getenv("MAXLEN")?.toInt()
-            val qualify: Boolean = System.getenv("Qualify")?.toBoolean() ?: false
+            val qualify: Boolean = System.getenv("QUALIFY")?.toBoolean() ?: false
             System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
                 System.err.println("loading meta for $tname")
 
