@@ -24,7 +24,7 @@ class QueryToFlat {
 
         fun go(vararg args: String) {
             if (args.size < 1) {
-                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [MAXLEN=Integer] [TABLENAME='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
+                System.err.println(MessageFormat.format("dump query to stdout or \$OUTPUT \n [QUALIFY=true] [MAXLEN=Integer] [TABLENAME='tablename'] [OUTPUT='outfilename.txt'] {0} ''jdbc-url'' <sql>   ", QueryToFlat::class.java.canonicalName))
                 exit(1)
             }
             val jdbcUrl = args[0]
@@ -40,6 +40,7 @@ class QueryToFlat {
             val DRIVER = DriverManager.getDriver(jdbcUrl)
             val conn = DRIVER.connect(jdbcUrl, System.getProperties())
             val maxlen: Int? = System.getenv("MAXLEN")?.toInt()
+            val qualify: Boolean = System.getenv("Qualify")?.toBoolean() ?: false
             System.getenv("TABLENAME")?.split(",")?.forEach { tname ->
                 System.err.println("loading meta for $tname")
 
@@ -84,7 +85,13 @@ class QueryToFlat {
                             }
                         }.toTypedArray()
                         cnames = (1..cursorRow.metaData.columnCount).map {
-                            cursorRow.metaData.getColumnName(it)
+                            if (qualify)
+                                arrayOf(cursorRow.metaData.getSchemaName(it),
+                                        cursorRow.metaData.getTableName(it),
+                                        cursorRow.metaData.getColumnName(it)
+                                ).joinToString("@")
+                            else
+                                cursorRow.metaData.getColumnName(it)
                         }.toTypedArray()
 
                         var accum = 0
