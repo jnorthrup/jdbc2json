@@ -13,13 +13,6 @@ import java.text.SimpleDateFormat
 import java.util.Arrays.asList
 import kotlin.math.min
 
-typealias codec = (ByteArray) -> Any
-typealias FieldParser<T> = Function1<ByteArray, T?>
-
-val Utf8String: FieldParser<String> = {
-    String(it).takeUnless(String::isBlank)?.trimEnd()
-}
-
 /**
  * write records using deterministic _rev on the intended json
  * User: jim

@@ -5,6 +5,27 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import java.util.*
+
+
+typealias codec = (ByteArray) -> Any
+typealias FieldParser<T> = Function1<ByteArray, T?>
+
+val Utf8String: FieldParser<String> = {
+    String(it).takeUnless(String::isBlank)?.trimEnd()
+}
+val IntMapper: FieldParser<Int> = {
+    String(it).takeUnless(String::isBlank)?.trimEnd()?.toInt()
+}
+val DateMapper: FieldParser<Date> = {
+    String(it).takeUnless(String::isBlank)?.trimEnd()?.let { Date(it) }
+}
+val LongMapper: FieldParser<Long> = {
+    String(it).takeUnless(String::isBlank)?.trimEnd()?.toLong()
+}
+val DoubleMapper: FieldParser<Double> = {
+    String(it).takeUnless(String::isBlank)?.trimEnd()?.toDouble()
+}
 
 /**
  * maps a single pandas "fwf" fixed-width-file to mmap, limitted by ByteBuffer inherrent size limit  to 2.5 gigs.
@@ -13,6 +34,7 @@ import java.nio.channels.FileChannel
  * and process destruction should be short.
  */
 class MappedDataFrame(
+
         val fn: String,
         val fieldMeta: List<Pair<String, Pair<Int, Int>>>,
         typeMap: Map<Int, FieldParser<*>> = emptyMap(),
@@ -76,4 +98,18 @@ class MappedDataFrame(
             }
         })
     }
+}
+
+fun main(args: Array<String>) {
+
+    val d1names = arrayOf("date", "channel", "deliver_qty", "return_qty")
+    val x = arrayOf((0 to 10), (10 to 84), (84 to 124), (124 to 164) )
+     val mappedDataFrame = MappedDataFrame("caven.fwf",d1names.zip(x))
+    System.err.println(mappedDataFrame.size)
+
+    (0 until 20).forEach{
+        System.err.println(it to mappedDataFrame.recordAsMap(it)
+        )
+    }
+
 }
