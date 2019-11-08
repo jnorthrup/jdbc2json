@@ -11,7 +11,6 @@ import java.sql.ResultSet
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
 import java.util.Arrays.asList
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -81,7 +80,9 @@ class QueryToFlat {
                 generateSequence { rs.takeIf { rs.next() } }.forEachIndexed { rownum, cursorRow ->
                     if (rownum == 0) {
                         cwidths = (1..cursorRow.metaData.columnCount).map {
-                            cursorRow.metaData.getColumnDisplaySize(it).let { maxlen?.let { min(maxlen, it) } ?: it }
+                            cursorRow.metaData.getColumnDisplaySize(it).let {
+                                maxlen?.run { min(this, it) } ?: it
+                            }
                         }.toTypedArray()
                         cnames = (1..cursorRow.metaData.columnCount).map {
                             if (qualify)
