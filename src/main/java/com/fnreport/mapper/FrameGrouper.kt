@@ -1,8 +1,8 @@
-package com.fnreport
+package com.fnreport.mapper
 
 class FrameGrouper(
-    private val origin: IDataFrame,
-    vararg val gby: Int
+        private val origin: IDataFrame,
+        vararg val gby: Int
 ) : IDataFrame {
     /**
      * when group frame renders a row it opens this array

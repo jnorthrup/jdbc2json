@@ -1,15 +1,16 @@
-package com.fnreport
+package com.fnreport.mapper
 
+import com.fnreport.SubFrame
 import java.nio.ByteBuffer
 
 abstract class ByteDataFrame(
-    private val codex: Array<Decoder>,
-    open val buffer: ByteBuffer,
-    val recordLen: Int,
-    override val size: Int,
-    private var currentRow: Int = 0
-    /*,  no apparent speedup at all over allocation.
-    val trampoline: Array<ByteArray> = codexTrampoline(codex)*/
+        private val codex: Array<Decoder>,
+        open val buffer: ByteBuffer,
+        val recordLen: Int,
+        override val size: Int,
+        private var currentRow: Int = 0
+        /*,  no apparent speedup at all over allocation.
+        val trampoline: Array<ByteArray> = codexTrampoline(codex)*/
 ) : IDataFrame {
 
     override operator fun get(vararg select: Int) = select.map { codex[it] }.toTypedArray().let { newSelector: Codex ->
@@ -17,15 +18,15 @@ abstract class ByteDataFrame(
     }
 
     override operator fun get(vararg select: String) =
-        get(* codex.mapIndexed { index, (first) -> first.first() to index }.toMap().let { x ->
-            select.map { x[it]!! }
-        }.toIntArray()
-        )
+            get(* codex.mapIndexed { index, (first) -> first.first() to index }.toMap().let { x ->
+                select.map { x[it]!! }
+            }.toIntArray()
+            )
 
     override fun group(
-        vararg gby: Int/*,todo
+            vararg gby: Int/*,todo
         vararg reducers: Array<out Pair<Int, (Any?) -> Any?>>*/
-    ): IDataFrame = FrameGrouper(this, *gby )
+    ): IDataFrame = FrameGrouper(this, *gby)
 
     /** training wheels method leftover from iniitial experiments.
      */
@@ -36,13 +37,13 @@ abstract class ByteDataFrame(
                     field.first() to reifyExtent(mapper, end - begin, buf.position(rowOffset + begin))
                 } catch (e: Exception) {
                     System.err.println(
-                        "" + mapOf(
-                            "buf" to buf,
-                            "currRow" to currentRow,
-                            "index" to index,
-                            "field" to field,
-                            "mapper" to mapper
-                        )
+                            "" + mapOf(
+                                    "buf" to buf,
+                                    "currRow" to currentRow,
+                                    "index" to index,
+                                    "field" to field,
+                                    "mapper" to mapper
+                            )
                     )
                     e.printStackTrace()
                     throw   Error("dead")
@@ -51,8 +52,8 @@ abstract class ByteDataFrame(
         }
     }
 
-    override operator fun iterator() = (0 until size).map(this::invoke) .iterator()
-    override operator fun invoke(row: Int) = codex .map { (field, mapper) ->
+    override operator fun iterator() = (0 until size).map(this::invoke).iterator()
+    override operator fun invoke(row: Int) = codex.map { (field, mapper) ->
         val (rowOffset, buf) = seekToRecord(row)
         val (_, coords) = field
         val (begin, _) = coords
@@ -77,13 +78,22 @@ abstract class ByteDataFrame(
         }
 
     /**lens syntax*/
-    override operator fun get(select: Int, lens: (Any?) -> Any?) =
-
-        SubFrame(codex.mapIndexed { index, decoder ->
-            decoder.takeUnless { index == select } ?: decoder.let { (a, b) ->
-                a to { ba: ByteArray -> lens(b(ba)) } as FieldParser<*>
+    override operator fun get(select: Int, lens: (Any?) -> Any?): IDataFrame {
+        val origin = this
+        val value = object : IDataFrame by this {
+            override fun invoke(row: Int): Any? {
+                val q = origin.invoke(row)
+                return (q as? List<Any?>)?.let {
+                    it.slice(0 until select) + lens(q[select]) + it.slice(select + 1 until it.size)
+                } ?: if (columns.size == 1) lens(q) else q
             }
-        }.toTypedArray(), this)
+     override   operator fun invoke(rows: IntArray) = rows.map { i -> invoke(i) }
+     override   operator fun invoke(rows: IntRange) = rows.map { i -> invoke(i) }
+     override   operator fun iterator() = invoke(0 until size ).iterator()
+        }
+        return value
+    }
+
 
     fun seekToRecord(index: Int) = (recordLen * index).let { rowOffset ->
         currentRow = index
@@ -107,7 +117,7 @@ abstract class ByteDataFrame(
                             keys.map { keyInstance ->
                                 Decoder({ "${keyprefixFunc()}:$keyInstance,${propSuffixFunc()}" } to propCoordinates) { bytes ->
                                     propParser.takeIf { keyIndex[currentRow] == keyInstance }?.invoke(bytes)
-                                        ?: NullMapper(bytes)
+                                            ?: NullMapper(bytes)
                                 }
                             }
                         }
@@ -116,8 +126,8 @@ abstract class ByteDataFrame(
             }
         }.flatMap { it }.toTypedArray()
         return SubFrame(
-            (untouched.map { codex[it] } +
-                    decoders).toTypedArray(), this
+                (untouched.map { codex[it] } +
+                        decoders).toTypedArray(), this
         )
     }
 
@@ -127,9 +137,9 @@ abstract class ByteDataFrame(
          * for extracting field bytes we reuse trampoline buffers.
          */
         fun reifyExtent(
-            mapper: FieldParser<*>,
-            size: Int,
-            buf: ByteBuffer
+                mapper: FieldParser<*>,
+                size: Int,
+                buf: ByteBuffer
         ): Any? = /*trampoline.first { it.size == size }*/ByteArray(size).also { buf.get(it) }.let(mapper)
     }
 }

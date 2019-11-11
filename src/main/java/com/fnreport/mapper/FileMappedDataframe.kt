@@ -1,15 +1,9 @@
-package com.fnreport
+package com.fnreport.mapper
 
 import java.io.Closeable
 import java.io.RandomAccessFile
-import java.lang.Integer.max
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.*
-import kotlin.math.min
-import kotlin.system.measureTimeMillis
 
 
 /**
@@ -34,18 +28,18 @@ import kotlin.system.measureTimeMillis
  *
  */
 class FileMappedDataframe(
-    fn: String?,
-    fieldMeta: List<ParseDescriptor>,
-    typeMap: Map<Int, FieldParser<*>> = emptyMap(),
-    mappers: Array<FieldParser<*>> = Array(fieldMeta.size) { typeMap[it] ?: StringMapper },
-    randomAccessFile: RandomAccessFile = RandomAccessFile(fn!!, "r"),
-    channel: FileChannel = randomAccessFile.channel!!,
-    override val buffer: MappedByteBuffer = channel.map(
+        fn: String?,
+        fieldMeta: List<ParseDescriptor>,
+        typeMap: Map<Int, FieldParser<*>> = emptyMap(),
+        mappers: Array<FieldParser<*>> = Array(fieldMeta.size) { typeMap[it] ?: StringMapper },
+        randomAccessFile: RandomAccessFile = RandomAccessFile(fn!!, "r"),
+        channel: FileChannel = randomAccessFile.channel!!,
+        override val buffer: MappedByteBuffer = channel.map(
         FileChannel.MapMode.READ_ONLY,
         0,
         randomAccessFile.length()
     ),
-    recordLen: Int = run {
+        recordLen: Int = run {
         fieldMeta.last().let { (_, pair) ->
             pair.let { (_, end) ->
                 buffer.mark().position(end).apply {
