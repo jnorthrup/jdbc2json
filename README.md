@@ -17,9 +17,9 @@ millesecond operations for the following big data import usecases:
     written to close the gap on existing relational engines and pandas/numpy options which have a sharp efficiency 
     drop with these frequent usecases on large datasets
 
- [x]  Immutable Memory mapped FWF flat files 
+  - [x]  Immutable Memory mapped FWF flat files 
  
- [x]  Instantaneous zero-copy data manipulations
+   -  [x]  Instantaneous zero-copy data manipulations
  
        * Sparse GroupBy - instant 
        
@@ -29,9 +29,9 @@ millesecond operations for the following big data import usecases:
        
        
        
- [x]  Idiomatic predicate, Filtering, Column Remapping 
+ -  [x]  Idiomatic predicate, Filtering, Column Remapping 
  
- [x]  Sql->FWF short path scripts in the appendix 
+ - [x]  Sql->FWF short path scripts in the appendix 
     
 
 ### Couchdb midpoint conversions - 
