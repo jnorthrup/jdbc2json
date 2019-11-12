@@ -1,6 +1,4 @@
-import com.fnreport.mapper.DateMapper
-import com.fnreport.mapper.DoubleMapper
-import com.fnreport.mapper.FileMappedDataframe
+import com.fnreport.mapper.*
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
@@ -8,16 +6,14 @@ import org.junit.Test
 import kotlin.test.assertEquals
 
 class FileMappedDataframeTest {
-    lateinit var mappedDataFrame: FileMappedDataframe
-    val d1names = arrayOf("date", "channel", "deliver_qty", "return_qty").map { { it } }
-    val x = arrayOf((0 to 10), (10 to 84), (84 to 124), (124 to 164))
-    val filemappers = mapOf(0 to DateMapper, 2 to DoubleMapper, 3 to DoubleMapper)
+    lateinit var mappedDataFrame: MappedFwf
     @Before
     fun setUp() {
-        this.mappedDataFrame = FileMappedDataframe(
-                "src/test/resources/caven20.fwf",
-                d1names.zip(x),
-                filemappers
+val d1names = listOf("date", "channel", "deliver_qty", "return_qty")
+        val x = arrayOf((0 to 10), (10 to 84), (84 to 124), (124 to 164))
+        dlnames.zip(x.toList())
+        val filemappers = mapOf(0 to DateMapper, 2 to DoubleMapper, 3 to DoubleMapper)
+        this.mappedDataFrame = MappedFwf(
 
         )
     }

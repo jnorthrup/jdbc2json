@@ -26,18 +26,3 @@ private val dateTimeFormatter = DateTimeFormatter.ISO_DATE
 val DoubleMapper: FieldParser<Double?> = {
     String(it).takeUnless(String::isBlank)?.trimEnd()?.toDouble()
 }
-
-/**
- * return in order of frequency
- */
-private fun codexTrampoline(codex: Codex): Array<ByteArray> {
-    val sizes = TreeMap<Int, Int>()
-
-    codex.map { (meta) ->
-        val (_, coord) = meta
-        coord.size
-    }.forEach { x ->
-        sizes[x] = (sizes[x] ?: 0) + 1
-    }
-    return sizes.entries.sortedBy { (_, v) -> v }.map { (key) -> ByteArray(key) }.toTypedArray()
-}
