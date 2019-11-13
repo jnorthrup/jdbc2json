@@ -1,3 +1,4 @@
+/*
 import com.fnreport.mapper.*
 import org.junit.After
 import org.junit.Assert
@@ -9,13 +10,21 @@ class FileMappedDataframeTest {
     lateinit var mappedDataFrame: MappedFwf
     @Before
     fun setUp() {
-val d1names = listOf("date", "channel", "deliver_qty", "return_qty")
-        val x = arrayOf((0 to 10), (10 to 84), (84 to 124), (124 to 164))
-        dlnames.zip(x.toList())
+        val zip =
+                listOf("date", "channel", "deliver_qty", "return_qty").zip(
+                        listOf((0 to 10), (10 to 84), (84 to 124), (124 to 164)).toList())
         val filemappers = mapOf(0 to DateMapper, 2 to DoubleMapper, 3 to DoubleMapper)
-        this.mappedDataFrame = MappedFwf(
+        zip.mapIndexed({ index: Int, (name, coord): Pair<String, Pair<Int, Int>> ->
+            val mapper: Any = filemappers[index] ?: StringMapper
+            Decoder(object : Column {
+                override val name: String
+                        get() = name
+            },mapper,coord )
 
-        )
+
+        })
+        this.mappedDataFrame = MappedFwf()
+
     }
 
     @After
@@ -42,9 +51,9 @@ val d1names = listOf("date", "channel", "deliver_qty", "return_qty")
     fun pivot() {
 
         val pivot = mappedDataFrame.pivot(arrayOf(0), 1, 2, 3)
-        var p = pivot(0)as List<*>
+        var p = pivot(0) as List<*>
         val columns = pivot.columns
-         System.err.println(columns.zip(p))
+        System.err.println(columns.zip(p))
     }
 
     @Test
@@ -60,8 +69,8 @@ val d1names = listOf("date", "channel", "deliver_qty", "return_qty")
         any = (mappedDataFrame[1, { (it as? String)?.substring(0 until 7) ?: it }](1) as List<*>)[1]
         System.err.println(any)
         assertEquals("0102211", (any as? List<*>)?.first() ?: any)
-        val pivot = mappedDataFrame[2,{it?:0.0}][3,{it?:0.0}].pivot(arrayOf(0), 1, 2, 3)(0)
+        val pivot = mappedDataFrame[2, { it ?: 0.0 }][3, { it ?: 0.0 }].pivot(arrayOf(0), 1, 2, 3)(0)
 
         System.err.println(pivot)
     }
-}
+}*/

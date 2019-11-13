@@ -1,3 +1,4 @@
+/*
 package com.fnreport.mapper
 
 import org.junit.Before
@@ -13,4 +14,4 @@ class MappedFwfTest {
         val filemappers = mapOf (0 to DateMapper, 2 to DoubleMapper, 3 to DoubleMapper)
 
     }
-}
+}*/
