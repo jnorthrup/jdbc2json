@@ -141,7 +141,7 @@
                 </executions>
 
                 <configuration>
-                    <jvmTarget>12</jvmTarget>
+                    <jvmTarget>11</jvmTarget>
                 </configuration>
             </plugin>
             <plugin>

@@ -1,4 +1,4 @@
-/*
+package com.fnreport.mapper/*
 package com.fnreport.mapper
 
 import org.junit.Before

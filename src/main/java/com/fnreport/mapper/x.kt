@@ -1,6 +1,10 @@
 package com.fnreport.mapper
 
-import java.io.Closeable
+ import kotlinx.coroutines.InternalCoroutinesApi
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.FlowCollector
+ import kotlinx.coroutines.flow.flowOf
+ import java.io.Closeable
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
@@ -8,7 +12,9 @@ import java.nio.channels.FileChannel
 
 typealias Column = Pair<String, (Any?) -> Any?>
 typealias Coordinates = Pair<Int, Int>
-typealias Decoder = Triple<Column, (ByteArray) -> Any?, Coordinates>
+typealias Decoder = Triple<Column, Coordinates, (ByteArray,Coordinates) -> Any?>
+
+
 
 interface RowStore<T> {
 
@@ -20,7 +26,7 @@ interface RowStore<T> {
 }
 
 
-interface FixedRowStore<T> : RowStore<T> {
+interface FixedRowStore<T> : Scalar<Lazy<ByteBuffer>> {
     val recordLen: Int
     val size: Int
 }
@@ -38,18 +44,11 @@ interface IDataFrame<T> : RowStore<T>, ColumnAccess<T>
 
 //todo: map multiple segments for a very big file
 open class MappedFile(
-//        codex: List<Decoder>,
         filename: String,
         randomAccessFile: RandomAccessFile = RandomAccessFile(filename, "r"),
         channel: FileChannel = randomAccessFile.channel,
         length: Long = randomAccessFile.length(),
-        val mappedByteBuffer: MappedByteBuffer = channel.map(FileChannel.MapMode.PRIVATE, 0, length)
-//        val recordLen: Int = mappedByteBuffer.run {
-//            var c = 0.toByte();
-//            do c = get() while (c != '\n'.toByte())
-//            position()
-//        },
-//        val size: Int = (recordLen / length).toInt()//d functions use File | Settings | File Templates.
+        val mappedByteBuffer: MappedByteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, length)
 ) : RowStore<ByteBuffer>, FileAccess(
         filename), Closeable by randomAccessFile {
     override fun invoke(row: Int): ByteBuffer = mappedByteBuffer.apply { position(row) }.slice()
@@ -58,46 +57,16 @@ open class MappedFile(
 
 //todo: map multiple segments for a very big file
 
-class FixedLineStore(/*override val columns: List<Column> =listOf(  Column("line", { any: Any? -> (any as? Lazy<*>)?.value ?: any })),*/
-                     val origin: MappedFile, override val recordLen: Int, override val size: Int) : FixedRowStore<Lazy<ByteBuffer>> {
-    override fun invoke(row: Int): Lazy<ByteBuffer> = lazyOf(origin.invoke(row * recordLen).limit(recordLen) as ByteBuffer)
-//    override fun get(vararg c: Int)  =this;
+abstract class LineBuffer :Scalar<Flow<ByteBuffer>>
+
+class FixedRecordLengthBuffer(filename: String,private val origin: MappedFile = MappedFile(filename),
+                              val recordLen: Int = origin.mappedByteBuffer.run {
+                                  var c = 0.toByte();
+                                  do c =  get() while (c != '\n'.toByte())
+                                  position()
+                              },
+                              val size: Int = (recordLen / origin.mappedByteBuffer.limit()).toInt()
+)        : LineBuffer(),Closeable by origin{
+    override fun   get(row: Int) = flowOf(   origin(recordLen*row).apply {   limit(recordLen)} )
+
 }
-
-
-/*
-
-    override fun invoke(row: Int) =
-            (row * recordLen).let { offset ->
-                codex.map { decoder: Decoder ->
-                    decoder.let { (column: Column, codec, coord: Coordinates) ->
-                        val (name, reifier) = column
-                        val input = coord.let { (begin, end): Pair<Int, Int> ->
-                        }
-                        val any = codec(input)
-                        reifier(any)
-                    }
-                }
-            }
-
-    override fun get(vararg c: Int): RowStore = let { origin: IDataFrame ->
-        object : IDataFrame {
-            override fun invoke(row: Int): List<Any?> {
-
-            }
-
-            override fun get(vararg c: Int): RowStore {
- c.map {origin.columns[c]}
-
-            }
-
-            override val columns: List<Column>
-                get() = TODO("not implemented") //To change initializer of created properties use File | Settings | File Templates.
-        }
-    }
-}
-
-*/
-
-
-
