@@ -1,7 +1,8 @@
 package com.fnreport.mapper
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.runBlocking
 import java.io.Closeable
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -86,10 +87,12 @@ open class FixedRecordLengthBuffer(val buf: ByteBuffer,
 
 }
 
-class VariableRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, VariableRecordLengthBuffer(buf = origin.mappedByteBuffer)
+open class VariableRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, VariableRecordLengthBuffer(buf = origin.mappedByteBuffer)
 
-open class VariableRecordLengthBuffer(val buf: ByteBuffer, val eor: Char = '\n', val index: IntArray = buf.duplicate().clear().run {
-    val list = mutableListOf<Int>(position())
+open class VariableRecordLengthBuffer(val buf: ByteBuffer, val header:Boolean=false,val eor: Char = '\n', val index: IntArray = buf.duplicate().clear().run {
+    val list = mutableListOf<Int>()
+    if(!header)list+=position()
+
     var c = 0.toChar()
     while (hasRemaining()) {
         c = get().toChar()
@@ -97,21 +100,35 @@ open class VariableRecordLengthBuffer(val buf: ByteBuffer, val eor: Char = '\n',
             list += position()
     }
     list.toIntArray()
-}
-) : LineBuffer() {
+}, val size: Int = index.size) : LineBuffer() {
     override fun get(vararg rows: Int) =
             rows.map { row: Int ->
-                val begin = index[row]
-                buf.position(begin).slice().also { slice ->
-                    val last = index.size - 1
-                    if (row != last) {
-                        val nextRecord = index[row + 1]
-                        val sliceLen = nextRecord - begin - 1
-                        slice.limit(sliceLen)
+                buf.position(index[row]).slice().also {
+                    if (row != index.size - 1) {
+                        it.limit(index[row + 1] - index[row] - 1)
                     }
                 }
             }.asFlow()
 }
 
 
+@UseExperimental(InternalCoroutinesApi::class)
+class CsvFile(fn: String, delim: CharArray = charArrayOf('\n', ','), val header: Boolean=true, val fileBuf: VariableRecordLengthFile = VariableRecordLengthFile(fn)) : Indexed<Flow<Flow<VariableRecordLengthBuffer>>> {
+
+    lateinit var columns: List<String>
+
+    init {
+        runBlocking {
+            val codexBuf = fileBuf[0].first()
+            val row0 = VariableRecordLengthBuffer(codexBuf,  eor=',')
+            columns = row0[0 until row0.size].map { b ->
+                String(ByteArray(b.remaining()).also { z -> b.get(z) })
+            }.toList()
+        }
+    }
+
+      override operator fun   get(vararg rows: Int)  = fileBuf.get(*rows).map{ flowOf( VariableRecordLengthBuffer(it,eor=','))}
+
+
+}
 
