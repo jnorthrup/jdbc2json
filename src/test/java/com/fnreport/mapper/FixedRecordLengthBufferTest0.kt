@@ -12,10 +12,16 @@ class FixedRecordLengthBufferTest0 : StringSpec() {
     }
 
     init {
-        "get" {
-            val x = FixedRecordLengthBuffer("src/test/resources/caven20.fwf")
+        "FixedRecordLengthFile" {
+            val x = FixedRecordLengthFile("src/test/resources/caven20.fwf")
             val flow = x[0, 19, 10]
 
+            suspend1(flow)
+
+        }
+        "VariableRecordLengthFile" {
+            val x = VariableRecordLengthFile("src/test/resources/caven20.fwf")
+            val flow = x[0, 19, 10]
             suspend1(flow)
 
         }
@@ -29,18 +35,12 @@ class FixedRecordLengthBufferTest0 : StringSpec() {
                      val bb = ByteArray(byteBuffer.remaining());
                      byteBuffer.get(bb)
                        String(bb)
-//                     System.err.println(string)
-                 }
+                  }
 
          val trim = reified[1].trim()
-         trim.shouldBe("2017-07-060100865/0101010106/13-14/01                                               4.000000000000                          0E-12" )
          System.err.println( trim )//.shouldBe("2017-07-060100865/0101010106/13-14/01                                               4.000000000000                          0E-12" )
-         /*collect { byteBuffer ->
-     val bb=ByteArray(byteBuffer.remaining());
-     byteBuffer.get(bb)
-     val string = String(bb)
-               System.err.println (string)
- } */
-//         Unit
+
+         trim.shouldBe("2017-07-060100865/0101010106/13-14/01                                               4.000000000000                          0E-12" )
+
      }
 }

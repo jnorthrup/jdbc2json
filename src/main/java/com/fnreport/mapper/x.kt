@@ -70,30 +70,48 @@ interface Indexed<T> {
 //todo: map multiple segments for a very big file
 
 abstract class LineBuffer : Indexed<Flow<ByteBuffer>>
+class FixedRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, FixedRecordLengthBuffer(buf = origin.mappedByteBuffer)
 
-class FixedRecordLengthBuffer(filename: String, origin: MappedFile = MappedFile(filename), private val buf: MappedByteBuffer = origin.mappedByteBuffer,
-                              override val recordLen: Int = buf.run {
-                                  var c = 0.toByte()
-                                  do c = get() while (c != '\n'.toByte())
-                                  position()
-                              },
+open class FixedRecordLengthBuffer(val buf: ByteBuffer,
+                                   override val recordLen: Int = buf.run {
+                                       var c = 0.toByte()
+                                       do c = get() while (c != '\n'.toByte())
+                                       position()
+                                   },
 
-                              val size: Int = (recordLen / buf.limit())
+                                   val size: Int = (recordLen / buf.limit())
 ) : LineBuffer(),
-        Closeable by origin,
         FixedLength<Flow<ByteBuffer>> {
     override fun get(vararg rows: Int) = rows.map { buf.position(recordLen * it).slice().apply { limit(recordLen) } }.asFlow()
 
 }
 
-/*
-class VariableToken(filename: String, seperator = '\n', private val origin: MappedFile = MappedFile(filename),
-                    val size: Int = {
-                        val availableProcessors = Runtime.getRuntime().availableProcessors()
-                        origin.mappedByteBuffer.limit() / availableProcessors
-                    },
-                    )) : LineBuffer() {
-    override fun get(vararg rows: Int): Flow<ByteBuffer> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+class VariableRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, VariableRecordLengthBuffer(buf = origin.mappedByteBuffer)
+
+open class VariableRecordLengthBuffer(val buf: ByteBuffer, val eor: Char = '\n', val index: IntArray = buf.duplicate().clear().run {
+    val list = mutableListOf<Int>(position())
+    var c = 0.toChar()
+    while (hasRemaining()) {
+        c = get().toChar()
+        if (hasRemaining() && c == eor)
+            list += position()
     }
-}*/
+    list.toIntArray()
+}
+) : LineBuffer() {
+    override fun get(vararg rows: Int) =
+            rows.map { row: Int ->
+                val begin = index[row]
+                buf.position(begin).slice().also { slice ->
+                    val last = index.size - 1
+                    if (row != last) {
+                        val nextRecord = index[row + 1]
+                        val sliceLen = nextRecord - begin - 1
+                        slice.limit(sliceLen)
+                    }
+                }
+            }.asFlow()
+}
+
+
+
