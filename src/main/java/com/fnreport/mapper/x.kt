@@ -1,10 +1,9 @@
 package com.fnreport.mapper
 
- import kotlinx.coroutines.InternalCoroutinesApi
- import kotlinx.coroutines.flow.Flow
- import kotlinx.coroutines.flow.FlowCollector
- import kotlinx.coroutines.flow.flowOf
- import java.io.Closeable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.onEach
+import java.io.Closeable
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
@@ -12,8 +11,7 @@ import java.nio.channels.FileChannel
 
 typealias Column = Pair<String, (Any?) -> Any?>
 typealias Coordinates = Pair<Int, Int>
-typealias Decoder = Triple<Column, Coordinates, (ByteArray,Coordinates) -> Any?>
-
+typealias Decoder = Triple<Column, Coordinates, (ByteArray, Coordinates) -> Any?>
 
 
 interface RowStore<T> {
@@ -26,20 +24,22 @@ interface RowStore<T> {
 }
 
 
-interface FixedRowStore<T> : Scalar<Lazy<ByteBuffer>> {
+interface FixedRowStore<T> : Indexed<Lazy<ByteBuffer>> {
     val recordLen: Int
     val size: Int
 }
-
+/*
 interface ColumnAccess<T> {
     operator fun get(vararg c: Int): RowStore<T>
     val columns: List<Column>
-}
+}*/
 
 abstract class FileAccess(open val filename: String) : Closeable
 
+/*
 
 interface IDataFrame<T> : RowStore<T>, ColumnAccess<T>
+*/
 
 
 //todo: map multiple segments for a very big file
@@ -54,19 +54,30 @@ open class MappedFile(
     override fun invoke(row: Int): ByteBuffer = mappedByteBuffer.apply { position(row) }.slice()
 }
 
+/**
+One-dimensional ndarray with axis labels (including time series).
 
+Labels need not be unique but must be a hashable type. The object supports both integer- and label-based indexing and provides a host of methods for performing operations involving the index. Statistical methods from ndarray have been overridden to automatically exclude missing data (currently represented as NaN).
+
+Operations between Series (+, -, /, , *) align values based on their associated index values– they need not be the same length. The result index will be the sorted union of the two indexes.
+ */
+interface Indexed<T> {
+    operator fun get(vararg rows: Int): T
+    operator fun get(rows: IntRange): T = get(* rows.toList().toIntArray())
+
+}
 //todo: map multiple segments for a very big file
 
-abstract class LineBuffer :Scalar<Flow<ByteBuffer>>
+abstract class LineBuffer : Indexed<Flow<ByteBuffer>>
 
-class FixedRecordLengthBuffer(filename: String,private val origin: MappedFile = MappedFile(filename),
+class FixedRecordLengthBuffer(filename: String, private val origin: MappedFile = MappedFile(filename),
                               val recordLen: Int = origin.mappedByteBuffer.run {
-                                  var c = 0.toByte();
-                                  do c =  get() while (c != '\n'.toByte())
+                                  var c = 0.toByte()
+                                  do c = get() while (c != '\n'.toByte())
                                   position()
                               },
                               val size: Int = (recordLen / origin.mappedByteBuffer.limit()).toInt()
-)        : LineBuffer(),Closeable by origin{
-    override fun   get(row: Int) = flowOf(   origin(recordLen*row).apply {   limit(recordLen)} )
+) : LineBuffer(), Closeable by origin {
+    override fun get(vararg rows: Int)=  rows.map{origin(recordLen*it).apply {   limit(recordLen)}}.asFlow ()
 
 }

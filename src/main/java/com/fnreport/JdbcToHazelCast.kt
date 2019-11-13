@@ -3,9 +3,9 @@ package com.fnreport
 import com.hazelcast.config.Config
 import com.hazelcast.core.Hazelcast
 import com.hazelcast.nio.serialization.SerializableByConvention
-import kotlinx.serialization.ContextualSerialization
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
+//import kotlinx.serialization.ContextualSerialization
+//import kotlinx.serialization.Serializable
+//import kotlinx.serialization.Transient
 import org.apache.commons.codec.digest.DigestUtils
 import java.sql.ResultSetMetaData
 
