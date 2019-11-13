@@ -13,11 +13,11 @@ class FixedRecordLengthBufferTest0 : StringSpec() {
 
     init {
         "FixedRecordLengthFile" {
+            //colspecs=(0 , 10), (10 t, 84), (84 , 124), (124 , 164)
             val x = FixedRecordLengthFile("src/test/resources/caven20.fwf")
             val flow = x[0, 19, 10]
 
             suspend1(flow)
-
         }
         "VariableRecordLengthFile" {
             val x = VariableRecordLengthFile("src/test/resources/caven20.fwf")
