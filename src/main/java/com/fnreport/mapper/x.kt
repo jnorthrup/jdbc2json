@@ -2,7 +2,6 @@ package com.fnreport.mapper
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.onEach
 import java.io.Closeable
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -21,12 +20,13 @@ interface RowStore<T> {
      */
 
     operator fun invoke(row: Int): T
+
+    val size: Int
 }
 
 
-interface FixedRowStore<T> : Indexed<Lazy<ByteBuffer>> {
+interface FixedLength<T> : Indexed<T> {
     val recordLen: Int
-    val size: Int
 }
 /*
 interface ColumnAccess<T> {
@@ -48,7 +48,8 @@ open class MappedFile(
         randomAccessFile: RandomAccessFile = RandomAccessFile(filename, "r"),
         channel: FileChannel = randomAccessFile.channel,
         length: Long = randomAccessFile.length(),
-        val mappedByteBuffer: MappedByteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, length)
+        val mappedByteBuffer: MappedByteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, length),
+        override val size: Int = mappedByteBuffer.limit()
 ) : RowStore<ByteBuffer>, FileAccess(
         filename), Closeable by randomAccessFile {
     override fun invoke(row: Int): ByteBuffer = mappedByteBuffer.apply { position(row) }.slice()
@@ -70,14 +71,29 @@ interface Indexed<T> {
 
 abstract class LineBuffer : Indexed<Flow<ByteBuffer>>
 
-class FixedRecordLengthBuffer(filename: String, private val origin: MappedFile = MappedFile(filename),
-                              val recordLen: Int = origin.mappedByteBuffer.run {
+class FixedRecordLengthBuffer(filename: String, origin: MappedFile = MappedFile(filename), private val buf: MappedByteBuffer = origin.mappedByteBuffer,
+                              override val recordLen: Int = buf.run {
                                   var c = 0.toByte()
                                   do c = get() while (c != '\n'.toByte())
                                   position()
                               },
-                              val size: Int = (recordLen / origin.mappedByteBuffer.limit()).toInt()
-) : LineBuffer(), Closeable by origin {
-    override fun get(vararg rows: Int)=  rows.map{origin(recordLen*it).apply {   limit(recordLen)}}.asFlow ()
+
+                              val size: Int = (recordLen / buf.limit())
+) : LineBuffer(),
+        Closeable by origin,
+        FixedLength<Flow<ByteBuffer>> {
+    override fun get(vararg rows: Int) = rows.map { buf.position(recordLen * it).slice().apply { limit(recordLen) } }.asFlow()
 
 }
+
+/*
+class VariableToken(filename: String, seperator = '\n', private val origin: MappedFile = MappedFile(filename),
+                    val size: Int = {
+                        val availableProcessors = Runtime.getRuntime().availableProcessors()
+                        origin.mappedByteBuffer.limit() / availableProcessors
+                    },
+                    )) : LineBuffer() {
+    override fun get(vararg rows: Int): Flow<ByteBuffer> {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+}*/
