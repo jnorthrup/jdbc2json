@@ -11,8 +11,6 @@ import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-typealias Coordinates = Pair<Int, Int>
-
 
 interface RowStore<T> {
     /**
@@ -87,7 +85,7 @@ open class FixedRecordLengthBuffer(val buf: ByteBuffer,
  * our tight recursive object with flexible column features
  */
 @InternalCoroutinesApi
-open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String, Pair<Pair<Int, Int>, (ByteArray) -> Any?>>>) : FlowStore<Flow<List<*>>> {
+open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String, Pair<Pair<Int, Int>, (Any?) -> Any?>>>) : FlowStore<Flow<List<*>>> {
 
     override val size: Int
         get() = rs.size
@@ -108,8 +106,50 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
                 })
             }
 
+    suspend fun pivot(untouched: Array<Int>, lhs: Int, vararg rhs: Int): Columnar {
+        val lhsIndex = linkedMapOf<Any?, LinkedHashSet<Int>>()
+        (0 until size).map { rowIndex ->
+            val values = values(rowIndex)
+            values.collect { row ->
+                val key = row[lhs]
+                lhsIndex[key] = ((lhsIndex[key] ?: linkedSetOf()) + rowIndex) as LinkedHashSet<Int>
+            }
+        }
+
+        val pivotColumns = untouched.map { columns[it] }.toMutableList()
+        val (keyPrefix) = columns[lhs]
+        lhsIndex.entries.map { (k, v) ->
+            val keyname = "$keyPrefix:${(k as? ByteArray)?.let { it -> String(it) } ?: k}"
+            pivotColumns+=   rhs.map { rhsCol ->
+                columns[rhsCol].let { (rhsName, decode) ->
+                    val (extractor, mapper) = decode
+                    keyPrefix + rhsName to (extractor to { input: Any? ->
+                        (input as? Pair<Int, Any?>)?.let { (row, value) ->
+                            value.takeIf { row in v }?.let(mapper)
+                        }
+                    })
+                }
+            }
+            pivotColumns
+
+        }
+        return object : Columnar(rs, pivotColumns) {
+            override suspend fun values(row: Int): Flow<List<Any?>> {
+                return rs.values(row).let { rs1 ->
+                    flowOf(super.columns.map { (a, mapper) ->
+                        val (coor, conv: (Any?) -> Any?) = mapper
+                        val (begin, end) = coor
+                        val len = end - begin
+                        val fb = rs1.position(begin).slice().limit(len)
+                        conv(row to ByteArray(len).also { fb.get(it) })
+                    })
+                }
+            }
+        }
+    }
+
     suspend fun group(by: List<Int>): Columnar {
-        var origin = this
+        val origin = this
         val linearIndex = arrayListOf<List<Any?>>()
         this[by].run {
             (0 until size).map { rownum ->
@@ -142,11 +182,12 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
                                 }
                             }
 
-                        }.asFlow() as Flow<List<Any?>>
+                        }.asFlow()
                     }
         }
     }
 }
+
 
 open class VariableRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, VariableRecordLengthBuffer(buf = origin.mappedByteBuffer)
 
