@@ -1,7 +1,9 @@
 package com.fnreport.mapper
 
+import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import java.io.Closeable
 import java.io.RandomAccessFile
@@ -84,19 +86,20 @@ open class FixedRecordLengthBuffer(val buf: ByteBuffer,
 /**
  * our tight recursive object with flexible column features
  */
-class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String, Pair<Pair<Int, Int>,(ByteArray)->Any?>>>) : FlowStore<Flow<List<*>>> {
+@InternalCoroutinesApi
+open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String, Pair<Pair<Int, Int>, (ByteArray) -> Any?>>>) : FlowStore<Flow<List<*>>> {
 
     override val size: Int
         get() = rs.size
 
-    operator fun get(cols: IntArray): Columnar {
+    operator fun get(cols: List<Int>): Columnar {
         return Columnar(this.rs, cols.map { columns[it] })
     }
 
     override suspend fun values(row: Int) =
             rs.values(row).let { rs1 ->
                 flowOf(columns.map { (a, mapper) ->
-                    val (coor,conv)=mapper
+                    val (coor, conv) = mapper
                     val (begin, end) = coor
                     val len = end - begin
                     val fb = rs1.position(begin).slice().limit(len)
@@ -104,6 +107,45 @@ class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String, Pair
 
                 })
             }
+
+    suspend fun group(by: List<Int>): Columnar {
+        var origin = this
+        val linearIndex = arrayListOf<List<Any?>>()
+        this[by].run {
+            (0 until size).map { rownum ->
+                val values = values(rownum)
+                values.collect { theList ->
+                    linearIndex += theList
+                }
+            }
+        }
+        val collate = mutableMapOf<Int, List<Int>>()
+        linearIndex.mapIndexed { index, list ->
+            val hashCode = list.hashCode()
+            collate[hashCode] = (collate[hashCode] ?: emptyList()) + index
+        }
+        val originClusters = collate.values.toTypedArray()
+        return object : Columnar(rs, columns) {
+            override val size: Int
+                get() = collate.size
+
+            override suspend fun values(row: Int) =
+                    originClusters[row].let { originCLuster ->
+                        originCLuster.first().let { clusterKey ->
+                            columns.indices.map { indice ->
+                                if (indice in by) {
+                                    origin.values(row).collect { keyR -> keyR[indice] }
+                                } else {
+                                    originCLuster.map { originRow ->
+                                        origin.values(originRow).collect { keyR -> keyR[indice] }
+                                    }
+                                }
+                            }
+
+                        }.asFlow() as Flow<List<Any?>>
+                    }
+        }
+    }
 }
 
 open class VariableRecordLengthFile(filename: String, origin: MappedFile = MappedFile(filename)) : Closeable by origin, VariableRecordLengthBuffer(buf = origin.mappedByteBuffer)
