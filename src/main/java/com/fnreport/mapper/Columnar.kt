@@ -12,6 +12,17 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
 
+inline fun byteDecoder(): (Any?) -> Any? = { i ->
+    (i as? ByteBuffer)?.let { ByteArray(it.remaining())   }
+}
+
+inline fun stringMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { String(it).takeIf(String::isNotBlank)?.trim() }}
+inline fun intMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toInt()  } }
+inline fun floatMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toFloat()  } }
+inline fun doubleMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toDouble()  } }
+inline fun longMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toLong()  } }
+
+
 interface RowStore<T> {
     /**
      * seek to row
@@ -75,9 +86,10 @@ open class FixedRecordLengthBuffer(val buf: ByteBuffer,
                                        position()
                                    },
 
-                                   val size: Int = (recordLen / buf.limit())
-) : LineBuffer(), FixedLength<Flow<ByteBuffer>> {
+                                   override val size: Int = (recordLen / buf.limit())
+) : LineBuffer(), RowStore<ByteBuffer>, FixedLength<Flow<ByteBuffer>> {
     override fun get(vararg rows: Int) = rows.map { buf.position(recordLen * it).slice().apply { limit(recordLen) } }.asFlow()
+    override fun values(row: Int): ByteBuffer = buf.position(recordLen * row).slice().limit(recordLen)
 
 }
 
@@ -102,7 +114,6 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
                     val len = end - begin
                     val fb = rs1.position(begin).slice().limit(len)
                     conv(ByteArray(len).also { fb.get(it) })
-
                 })
             }
 
@@ -120,7 +131,7 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
         val (keyPrefix) = columns[lhs]
         lhsIndex.entries.map { (k, v) ->
             val keyname = "$keyPrefix:${(k as? ByteArray)?.let { it -> String(it) } ?: k}"
-            pivotColumns+=   rhs.map { rhsCol ->
+            pivotColumns += rhs.map { rhsCol ->
                 columns[rhsCol].let { (rhsName, decode) ->
                     val (extractor, mapper) = decode
                     keyPrefix + rhsName to (extractor to { input: Any? ->
@@ -179,7 +190,7 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
                                 originCLuster.map { originRow ->
                                     origin.values(originRow).collect { keyR -> keyR[indice] }
                                 }
-                            } as Any?
+                            }
                         }
 
                     }
