@@ -169,21 +169,24 @@ open class Columnar(var rs: RowStore<ByteBuffer>, val columns: List<Pair<String,
             override val size: Int
                 get() = collate.size
 
-            override suspend fun values(row: Int) =
-                    originClusters[row].let { originCLuster ->
-                        originCLuster.first().let { clusterKey ->
-                            columns.indices.map { indice ->
-                                if (indice in by) {
-                                    origin.values(row).collect { keyR -> keyR[indice] }
-                                } else {
-                                    originCLuster.map { originRow ->
-                                        origin.values(originRow).collect { keyR -> keyR[indice] }
-                                    }
+            override suspend fun values(row: Int): Flow<List<Any?>> {
+                val flowStar = originClusters[row].let { originCLuster ->
+                    val listAny = originCLuster.first().let { clusterKey ->
+                        columns.indices.map { indice ->
+                            if (indice in by) {
+                                origin.values(row).collect { keyR -> keyR[indice] }
+                            } else {
+                                originCLuster.map { originRow ->
+                                    origin.values(originRow).collect { keyR -> keyR[indice] }
                                 }
-                            }
+                            } as Any?
+                        }
 
-                        }.asFlow()
                     }
+                    listAny.asFlow() as Flow<List<Any?>>
+                }
+                return flowStar
+            }
         }
     }
 }
