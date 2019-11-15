@@ -10,17 +10,36 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 
-inline fun byteDecoder(): (Any?) -> Any? = { i ->
-    (i as? ByteBuffer)?.let { ByteArray(it.remaining())   }
+fun byteDecoder(): (Any?) -> Any? = { i ->
+    (i as? ByteBuffer)?.let { ByteArray(it.remaining()).also { i.get(it) } }
 }
 
-inline fun stringMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { String(it).takeIf(String::isNotBlank)?.trim() }}
-inline fun intMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toInt()  } }
-inline fun floatMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toFloat()  } }
-inline fun doubleMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toDouble()  } }
-inline fun longMapper(): (Any?) -> Any? ={ i-> ( i as? ByteArray)?.let { stringMapper()(it)?.toString()?.toLong()  } }
+fun stringMapper(): (Any?) -> Any? = { i -> (i as? ByteArray)?.let { String(it).takeIf(String::isNotBlank)?.trim() } }
+fun btoa(i: Any?) = (i as? ByteArray)?.let { stringMapper()(it)?.toString() }
+
+
+fun intMapper(): (Any?) -> Any? = { i -> btoa(i)?.toInt() }
+fun floatMapper(): (Any?) -> Any? = { i -> btoa(i)?.toFloat() }
+fun doubleMapper(): (Any?) -> Any? = { i -> btoa(i)?.toDouble() }
+fun longMapper(): (Any?) -> Any? = { i -> btoa(i)?.toLong() }
+
+
+fun dateMapper(): (Any?) -> Any? = { i ->
+    btoa(i)?.let {
+        var res: LocalDate?
+        try {
+            res = LocalDate.parse(it)
+        } catch (e: Exception) {
+            val parseBest = DateTimeFormatter.ISO_DATE.parseBest(it)
+            res = LocalDate.from(parseBest)
+        }
+        res
+    }
+}
 
 
 interface RowStore<T> {
