@@ -18,20 +18,26 @@ val objectMapper = ObjectMapper().apply {
     this.propertyNamingStrategy = PropertyNamingStrategy.SNAKE_CASE
 }
 
-fun DatabaseMetaData.jdbcEntity(catalogEntry: List<Any>): DbEntity {
-    val catalogEntry1 = catalogEntry
-    val dropLast = catalogEntry1!!.slice(0..3)
-    val map = dropLast.map{ it?.toString()}
-    return map!!.let{ hierarchy ->
-        val last = hierarchy.last()
-        last.let { tname ->
-            val columns = getColumns(hierarchy[0], hierarchy[1], tname, null)
-            val hdr = ColumnMetaColumns.values()
-            columns.jdbcRows(hdr)
-            DbEntity(hierarchy, tname, jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList())
-        }
-    }
+fun DatabaseMetaData.jdbcEntity(catalogEntry: Pair<List<String?>, List<Any?>>): DbEntity {
+    val (hdr, catalogEntry1) = catalogEntry
+    val metaMap = hdr.zip(catalogEntry1).toMap()
+    val hier = listOf<String>("TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME").map { "${metaMap[it]}" }
+    val (cat, schem, tname) = hier
+
+    return DbEntity(hier, tname, jdbcTablePkOrdinals(cat, schem, tname).toList())
 }
+//    val dropLast = listOf<String>("TABLE_CAT",  "TABLE_SCHEM"   ,"TABLE_NAME" ).map {  toMap[it]} /*catalogEntry1!!.slice(0..3)*/
+//    val map = dropLast.map{ it?.toString()}
+//    return map!!.let{ hierarchy ->
+//        val last = hierarchy.last()
+//        last.let { tname ->
+//            val columns = getColumns(hierarchy[0], hierarchy[1], tname, null)
+//            val hdr = ColumnMetaColumns.values()
+//            columns.jdbcRows(hdr)
+//            DbEntity(hierarchy, tname, jdbcTablePkOrdinals(hierarchy[0], hierarchy[1], tname).toList())
+//        }
+//    }
+//}
 
 
 /**
@@ -46,15 +52,15 @@ fun DatabaseMetaData.jdbcTablePkOrdinals(catalogName: String?,
 ) =
         jdbcTablePkColNameSequence(this, tname, schemaName, catalogName).map { cname -> this.jdbcColumnNameToOrdinal(catalogName, schemaName, tname, cname) }
 
-val ResultSetMetaData.jdbcColumnNames get() = (1..columnCount).map { getColumnLabel(it) }
+val ResultSetMetaData.jdbcColumnNames: List<String> get() = (1..columnCount).map { getColumnLabel(it) }
 fun <T> json(x: T) = objectMapper.writeValueAsString(x)
-fun ResultSet.jdbcRows(hdr: List<*>) = this.resultSequence().map { hdr.mapIndexed { index, _ -> index + 1 }.map(this::getObject) }
+fun ResultSet.jdbcRows(hdr: List<*>): Sequence<List<*>> = this.resultSequence().map { hdr.mapIndexed { index, _ -> index + 1 }.map(this::getObject) }
 fun ResultSet.jdbcRows(hdr: Array<*>) = this.jdbcRows(arrayListOf(hdr))
 fun ResultSet.resultSequence() = generateSequence { takeIf { next() } }
 fun DatabaseMetaData.jdbcColumnNameToOrdinal(cat: String?, schem: String?, tname: String, cname: String) =
         getColumns(cat, schem, tname, cname).also { it.next() }.getInt(ColumnMetaColumns.ORDINAL_POSITION.ordinal)
 
-fun Connection.tableScan(tname: String): Pair<ResultSetMetaData, Sequence<List<Any>>> {
+fun Connection.tableScan(tname: String): Pair<ResultSetMetaData, Sequence<List<*>>> {
     val statement = createStatement()
     statement.execute("select * from $tname")
     val resultSet = statement.resultSet
@@ -95,7 +101,7 @@ private fun jdbcTablePkMetaPair(dbMeta: DatabaseMetaData, tname: String,
                                 catalogName: String? = configs["CATALOG"]?.value
 ) = dbMeta.getPrimaryKeys(catalogName, schemaName, tname).resultSequence().map { it.getInt(PkSeqMeta.KEY_SEQ.ordinal) to it.getString(PkSeqMeta.COLUMN_NAME.ordinal) }
 
-fun rowAsTuples(pkColumns: List<Int>, row: List<Any>, pkName: String = "_id") = row.let { data ->
+fun rowAsTuples(pkColumns: List<Int>, row: List<*>, pkName: String = "_id") = row.let { data ->
     when (pkColumns.size) {
         0 -> emptyList<Pair<String, *>>()
         1 -> listOf(pkName to row[pkColumns.first() - 1].toString())

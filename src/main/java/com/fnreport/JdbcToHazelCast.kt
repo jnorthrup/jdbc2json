@@ -2,10 +2,6 @@ package com.fnreport
 
 import com.hazelcast.config.Config
 import com.hazelcast.core.Hazelcast
-import com.hazelcast.nio.serialization.SerializableByConvention
-import kotlinx.serialization.ContextualSerialization
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import org.apache.commons.codec.digest.DigestUtils
 import java.sql.ResultSetMetaData
 
@@ -43,9 +39,10 @@ object JdbcToHazelCast {
         val typs = typesConfig?.let { objectMapper.readValue(it, Array<String>::class.java) }
         val catalogResultSet = dbMeta.getTables(catName, schemaName, tablenamePattern, typs)
 
-        val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
+        val hdr = catalogResultSet.metaData.jdbcColumnNames
+        val catalogRows = catalogResultSet.jdbcRows(hdr)
 
-        val entities = catalogRows.map(dbMeta::jdbcEntity)
+        val entities = catalogRows.map { dbMeta.jdbcEntity(hdr to it) }
 
         val hz = Hazelcast.getOrCreateHazelcastInstance(Config(hzName))
 
@@ -88,10 +85,10 @@ data class DbEntity(val hierarchy: List<String>, val tname: String, val pkColumn
     val turd get() = Triple(hierarchy, tname, pkColumnIndexes)
     private lateinit var rsMetadata: ResultSetMetaData
 
-    private var cached: Sequence<List<Any>>? = null
+    private var cached: Sequence<List<*>>? = null
 
     companion object {
-        fun localStorage(dbEntity: DbEntity, jdbcUrl: String): Sequence<List<Any>> =
+        fun localStorage(dbEntity: DbEntity, jdbcUrl: String): Sequence<List<*>> =
                 dbEntity.cached ?: connectToJdbcUrl(jdbcUrl).let { (con, _) ->
                     val tableScan = con.tableScan(dbEntity.tname)
                     dbEntity.rsMetadata = tableScan.first

@@ -1,7 +1,5 @@
 package com.fnreport
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import org.intellij.lang.annotations.Language
 import java.io.IOException
 import java.lang.System.err
@@ -9,7 +7,6 @@ import java.lang.System.exit
 import java.net.HttpURLConnection
 import java.net.URL
 import java.sql.ResultSet
-import java.text.SimpleDateFormat
 import kotlin.system.exitProcess
 import kotlin.text.Charsets.UTF_8
 
@@ -53,10 +50,11 @@ object JdbcToCouchDbBulk {
         listOf(catalogg, schemaa, tablenamePattern).let { (cname, sname, tpat) ->
             val typs = typesConfig?.let { objectMapper.readValue(it, Array<String>::class.java) }
             val catalogResultSet = dbMeta.getTables(cname, sname, tpat, typs)
-            err.println(catalogResultSet.metaData.jdbcColumnNames.toString())
-            val catalogRows = catalogResultSet.jdbcRows(catalogResultSet.metaData.jdbcColumnNames)
+            val hdr = catalogResultSet.metaData.jdbcColumnNames
+            err.println(hdr.toString())
+            val catalogRows = catalogResultSet.jdbcRows(hdr)
 
-            catalogRows.map(dbMeta::jdbcEntity).forEach { e ->
+            catalogRows.map { dbMeta.jdbcEntity(hdr to it) }.forEach { e ->
                 val statement = connection.createStatement()
 
                 if (statement.execute("select count(*) from ${e.tname}")) {
