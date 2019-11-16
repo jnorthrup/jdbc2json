@@ -57,12 +57,12 @@ object JdbcToCouchDbBulk {
             catalogRows.map { dbMeta.jdbcEntity(hdr to it) }.forEach { e ->
                 val statement = connection.createStatement()
 
-                if (statement.execute("select count(*) from ${e.tname}")) {
+                if (statement.execute("select count(*) from '${e.tname}'")) {
                     val rowCount = statement.resultSet?.takeIf(ResultSet::next)?.getLong(1) ?: 0
                     if (rowCount > 0) {
                         fetchSize?.run { statement.fetchSize = fetchSize.toInt() }
                         with(statement) {
-                            execute("select * from ${e.tname}")
+                            execute("select * from '${e.tname}'")
                             with(resultSet) {
                                 val columnNameArray by lazy { metaData.jdbcColumnNames }
                                 val viewHeader by lazy {
