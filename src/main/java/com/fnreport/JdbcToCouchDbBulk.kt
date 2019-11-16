@@ -20,6 +20,7 @@ object JdbcToCouchDbBulk {
             EnvConfig("TERSE", "false", docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object."),
             EnvConfig("SCHEMAPATTERN"),
             EnvConfig("CATALOG"),
+            EnvConfig("QUOTES","[]","the dialect of sql you are using may require quotes specific to jdbc driver like single or double ticks or index brackets."),
             EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also"),
             EnvConfig("TYPES", """["TABLE"]""", """array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
     ).map { it.name to it }.toMap()
@@ -45,7 +46,7 @@ object JdbcToCouchDbBulk {
 
         val bulkSize = configs["BULKSIZE"]!!.value!!.toInt()
         val couchprefix = args[0]
-
+        val (qopen,qclose)=configs["QUOTES"]!!.value!!.map { it }
 
         listOf(catalogg, schemaa, tablenamePattern).let { (cname, sname, tpat) ->
             val typs = typesConfig?.let { objectMapper.readValue(it, Array<String>::class.java) }
@@ -57,12 +58,12 @@ object JdbcToCouchDbBulk {
             catalogRows.map { dbMeta.jdbcEntity(hdr to it) }.forEach { e ->
                 val statement = connection.createStatement()
 
-                if (statement.execute("select count(*) from '${e.tname}'")) {
+                if (statement.execute("select count(*) from $qopen${e.tname}$qclose")) {
                     val rowCount = statement.resultSet?.takeIf(ResultSet::next)?.getLong(1) ?: 0
                     if (rowCount > 0) {
                         fetchSize?.run { statement.fetchSize = fetchSize.toInt() }
                         with(statement) {
-                            execute("select * from '${e.tname}'")
+                            execute("select * from $qopen${e.tname}$qclose")
                             with(resultSet) {
                                 val columnNameArray by lazy { metaData.jdbcColumnNames }
                                 val viewHeader by lazy {
