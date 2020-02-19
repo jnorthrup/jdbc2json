@@ -23,7 +23,14 @@ run from project dir using scripts in bin:
   
  
 # docs
-see also 
+
+each of these simple query utilities have some basic self-docs by running withotu parms, shown below.
+
+each is wrapped in a shell script that figures out the how to add `lib/*.jar` to the classpath
+
+each utility uses configuration variables from the environment and also reiterates these as config variables to stderr as `java -D` switches for next time.
+
+the docs below are constructed by 
 ```bash
 for i in feathersql.sh flatsql.sh  jdbc2json.sh  jdbctocouchdbbulk.sh  sql2json.sh syncsql.sh;  do echo '###' $i ;echo ;echo '```';bin/$i 2>&1 |while read;do  echo $REPLY  ;done; echo '```';echo;done
  
