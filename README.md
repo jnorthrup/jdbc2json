@@ -31,7 +31,7 @@ for i in feathersql.sh flatsql.sh  jdbc2json.sh  jdbctocouchdbbulk.sh  sql2json.
 
 ### feathersql.sh
 
-dump small resultsets to arrow.
+dump small resultsets to apache arrow-feather.
 
 ```
 ++ dirname bin/feathersql.sh
@@ -43,14 +43,14 @@ dump query to stdout or $OUTPUT
 
 ### flatsql.sh
 
-dump resultsets to pandas fwf - stderr has preamble
+dump resultsets to pandas fwf as stdout - stderr has pandas/python preamble
 
 ```
-++ dirname bin/flatsql.sh
-+ JDIR=bin/../
-+ exec java -classpath 'bin/..//target/*:bin/..//target/lib/*' com.fnreport.QueryToFlat
+bin/flatsql.sh
+
 dump query to stdout or $OUTPUT
-[TABLENAME=tablename] [OUTPUT=outfilename.txt] com.fnreport.QueryToFlat 'jdbc-url' <sql>
+[TABLENAME=tablename] [OUTPUT=outfilename.txt] bin/flatsql.sh 'jdbc-url' <sql>
+
 ```
 
 ### jdbc2json.sh
