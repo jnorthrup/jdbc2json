@@ -24,7 +24,7 @@ run from project dir using scripts in bin:
  
 # docs
 
-each of these simple query utilities have some basic self-docs by running withotu parms, shown below.
+each of these simple query utilities have some basic self-docs by running without parms, shown below.
 
 each is wrapped in a shell script that figures out the how to add `lib/*.jar` to the classpath
 
