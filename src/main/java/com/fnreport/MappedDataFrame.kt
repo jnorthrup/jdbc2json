@@ -107,9 +107,6 @@ fun main(args: Array<String>) {
      val mappedDataFrame = MappedDataFrame("caven.fwf",d1names.zip(x))
     System.err.println(mappedDataFrame.size)
 
-    (0 until 20).forEach{
-        System.err.println(it to mappedDataFrame.recordAsMap(it)
-        )
-    }
+    (0 until 20).forEach { System.err.println(it to mappedDataFrame.recordAsMap(it)) }
 
 }
