@@ -69,6 +69,8 @@ object JdbcToCouchDbBulk {
                             execute("select * from ${qopen}${e.tname}${qclose}$lstring")
                             with(resultSet) {
                                 val columnNameArray by lazy { metaData.jdbcColumnNames }
+                                val columnTypeArray by lazy { (1..columnNameArray.size).map(metaData::getColumnTypeName) }
+                                val columnLenArray by lazy { (1..columnNameArray.size).map(metaData::getColumnDisplaySize) }
                                 val viewHeader by lazy {
                                     val id = e.pkColumnIndexes.takeUnless(List<Int>::isEmpty)?.let {
                                         try {
@@ -99,23 +101,29 @@ object JdbcToCouchDbBulk {
                                     @Language("JavaScript") val viewCode = """
                                         function (doc) {
                                                         var pkeys = ${json(e.pkColumnIndexes)};
-                                                        var columns = ${json(columnNameArray)};
-                                                        var e = {}; 
-                                                    
+                                                        var columns = ${json(columnNameArray)}; 
+                                                        var e = {};  
                                                         var row = doc.row;
                                                         var length = row.length;
                                                         for (var i = 0; i < length; i++) e[columns[i]] = row[i];
                                                         emit(${if (e.pkColumnIndexes.size < 2) "doc._id" else "JSON.parse(doc._id)"}, e)
-                                                    }""".trimIndent()
-                                    val terseViewsString = json(mapOf("_id" to "_design/meta",
-                                            "views" to mapOf(
-                                                    "asMap" to mapOf(
-                                                            "map" to (viewCode)
-                                                    )
-                                            ),
-                                            "language" to "javascript"))
+                                                    }""".trimMargin()
+                                    val terseViewsString = json(
+                                            mapOf("_id" to "_design/meta",
+                                                    "desc" to mapOf(
+                                                            "names" to columnNameArray,
+                                                            "types" to columnTypeArray,
+                                                            "lengths" to columnLenArray
+                                                    ),
+                                                    "views" to mapOf(
+                                                            "asMap" to mapOf(
+                                                                    "map" to (viewCode)
+                                                            )
+                                                    ),
+                                                    "language" to "javascript"
+                                            ))
 
-                                    err.println("attempting to write:\n" + terseViewsString + "\n----------")
+                                    err.println( "attempting to write:\n" + terseViewsString + "\n----------")
                                     couchConn.outputStream.write(terseViewsString.toByteArray(UTF_8))
 
                                     err.println(couchTable + ": " + couchConn.responseCode to couchConn.responseMessage)
