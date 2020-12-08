@@ -23,7 +23,14 @@ run from project dir using scripts in bin:
   
  
 # docs
-see also 
+
+each of these simple query utilities have some basic self-docs by running without parms, shown below.
+
+each is wrapped in a shell script that figures out the how to add `lib/*.jar` to the classpath
+
+each utility uses configuration variables from the environment and also reiterates these as config variables to stderr as `java -D` switches for next time.
+
+the docs below are constructed by 
 ```bash
 for i in feathersql.sh flatsql.sh  jdbc2json.sh  jdbctocouchdbbulk.sh  sql2json.sh syncsql.sh;  do echo '###' $i ;echo ;echo '```';bin/$i 2>&1 |while read;do  echo $REPLY  ;done; echo '```';echo;done
  
@@ -31,7 +38,7 @@ for i in feathersql.sh flatsql.sh  jdbc2json.sh  jdbctocouchdbbulk.sh  sql2json.
 
 ### feathersql.sh
 
-dump small resultsets to arrow.
+dump small resultsets to apache arrow-feather.
 
 ```
 ++ dirname bin/feathersql.sh
@@ -43,14 +50,14 @@ dump query to stdout or $OUTPUT
 
 ### flatsql.sh
 
-dump resultsets to pandas fwf - stderr has preamble
+dump resultsets to pandas fwf as stdout - stderr has pandas/python preamble
 
 ```
-++ dirname bin/flatsql.sh
-+ JDIR=bin/../
-+ exec java -classpath 'bin/..//target/*:bin/..//target/lib/*' com.fnreport.QueryToFlat
+bin/flatsql.sh
+
 dump query to stdout or $OUTPUT
-[TABLENAME=tablename] [OUTPUT=outfilename.txt] com.fnreport.QueryToFlat 'jdbc-url' <sql>
+[TABLENAME=tablename] [OUTPUT=outfilename.txt] bin/flatsql.sh 'jdbc-url' <sql>
+
 ```
 
 ### jdbc2json.sh
