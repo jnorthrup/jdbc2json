@@ -14,16 +14,28 @@ object JdbcToCouchDbBulk {
 
 
     val configs = listOf(
-            EnvConfig("FETCHSIZE", docString = "number of rows to fetch from jdbc"),
-            EnvConfig("BULKSIZE", "500", docString = "number of rows to write in bulk"),
-            EnvConfig("BATCHMODE", docString = "ifnotnull"),
-            EnvConfig("TERSE", "false", docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object."),
-            EnvConfig("SCHEMAPATTERN"),
-            EnvConfig("LIMIT", null, "fetch only this many rows per entity if set"),
-            EnvConfig("CATALOG"),
-            EnvConfig("QUOTES", "[]", "the dialect of sql you are using may require quotes specific to jdbc driver like single or double ticks or index brackets."),
-            EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also"),
-            EnvConfig("TYPES", """["TABLE"]""", """JSON array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """)
+        EnvConfig("FETCHSIZE", docString = "number of rows to fetch from jdbc"),
+        EnvConfig("BULKSIZE", "500", docString = "number of rows to write in bulk"),
+        EnvConfig("BATCHMODE", docString = "ifnotnull"),
+        EnvConfig(
+            "TERSE",
+            "false",
+            docString = "if not blank, this will write 1 array per record after potential record '_id'  and will create a view to decorate the values as an object."
+        ),
+        EnvConfig("SCHEMAPATTERN"),
+        EnvConfig("LIMIT", null, "fetch only this many rows per entity if set"),
+        EnvConfig("CATALOG"),
+        EnvConfig(
+            "QUOTES",
+            "[]",
+            "the dialect of sql you are using may require quotes specific to jdbc driver like single or double ticks or index brackets."
+        ),
+        EnvConfig("TABLENAMEPATTERN", null, "NULL is permitted, but pattern may include '%' also"),
+        EnvConfig(
+            "TYPES",
+            """["TABLE"]""",
+            """JSON array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" """
+        )
     ).map { it.name to it }.toMap()
 
 
@@ -35,11 +47,12 @@ object JdbcToCouchDbBulk {
         val (connection, dbMeta) = connectToJdbcUrl(jdbcUrl = args[1])
 
         val (fetchSize,
-                catalogg,
-                schemaa,
-                tablenamePattern,
-                typesConfig
-        ) = arrayOf("FETCHSIZE", "CATALOG", "SCHEMAPATTERN", "TABLENAMEPATTERN", "TYPES").map { configs.get(it)!! }.map(EnvConfig::value)
+            catalogg,
+            schemaa,
+            tablenamePattern,
+            typesConfig
+        ) = arrayOf("FETCHSIZE", "CATALOG", "SCHEMAPATTERN", "TABLENAMEPATTERN", "TYPES").map { configs.get(it)!! }
+            .map(EnvConfig::value)
         fetchSize?.run { err.println("setting fetchsize to: " + fetchSize) }
 
         val terse = configs["TERSE"]!!.value?.toBoolean() ?: false
@@ -88,6 +101,7 @@ object JdbcToCouchDbBulk {
                                 var couchConn = URL(couchTable).openConnection() as HttpURLConnection
                                 couchConn.requestMethod = "PUT"
                                 couchConn.setRequestProperty("Content-Type", "application/json")
+                                couchConn.setRequestProperty("Accept", "application/json")
                                 couchConn.doOutput = true
                                 couchConn.outputStream.write("".toByteArray())
 
@@ -97,6 +111,7 @@ object JdbcToCouchDbBulk {
                                     couchConn = URL(couchTable).openConnection() as HttpURLConnection
                                     couchConn.requestMethod = "POST"
                                     couchConn.setRequestProperty("Content-Type", "application/json")
+                                    couchConn.setRequestProperty("Accept", "application/json")
                                     couchConn.doOutput = true
                                     @Language("JavaScript") val viewCode = """
                                         function (doc) {
@@ -109,21 +124,23 @@ object JdbcToCouchDbBulk {
                                                         emit(${if (e.pkColumnIndexes.size < 2) "doc._id" else "JSON.parse(doc._id)"}, e)
                                                     }""".trimMargin()
                                     val terseViewsString = json(
-                                            mapOf("_id" to "_design/meta",
-                                                    "desc" to mapOf(
-                                                            "names" to columnNameArray,
-                                                            "types" to columnTypeArray,
-                                                            "lengths" to columnLenArray
-                                                    ),
-                                                    "views" to mapOf(
-                                                            "asMap" to mapOf(
-                                                                    "map" to (viewCode)
-                                                            )
-                                                    ),
-                                                    "language" to "javascript"
-                                            ))
+                                        mapOf(
+                                            "_id" to "_design/meta",
+                                            "desc" to mapOf(
+                                                "names" to columnNameArray,
+                                                "types" to columnTypeArray,
+                                                "lengths" to columnLenArray
+                                            ),
+                                            "views" to mapOf(
+                                                "asMap" to mapOf(
+                                                    "map" to (viewCode)
+                                                )
+                                            ),
+                                            "language" to "javascript"
+                                        )
+                                    )
 
-                                    err.println( "attempting to write:\n" + terseViewsString + "\n----------")
+                                    err.println("attempting to write:\n" + terseViewsString + "\n----------")
                                     couchConn.outputStream.write(terseViewsString.toByteArray(UTF_8))
 
                                     err.println(couchTable + ": " + couchConn.responseCode to couchConn.responseMessage)
@@ -133,14 +150,16 @@ object JdbcToCouchDbBulk {
 
                                 row.chunked(bulkSize).forEach { rowChunk ->
                                     try {
-                                        couchConn = URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
+                                        couchConn =
+                                            URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
                                         couchConn.requestMethod = "POST"
                                         couchConn.setRequestProperty("Content-Type", "application/json")
                                         couchConn.doInput = true
                                         couchConn.doOutput = true
                                     } catch (e: IOException) {
-                                        err.println("" +
-                                                couchConn.responseCode + " : " + couchConn.responseMessage
+                                        err.println(
+                                            "" +
+                                                    couchConn.responseCode + " : " + couchConn.responseMessage
                                         )
                                         e.printStackTrace()
                                         exitProcess(1)
@@ -165,7 +184,7 @@ object JdbcToCouchDbBulk {
 
     private fun printOptions() {
         err.println(
-                """
+            """
                         usage:
                         env vars:
                         ${configs.values.joinToString(prefix = "[", postfix = "]", separator = "] [")} 
