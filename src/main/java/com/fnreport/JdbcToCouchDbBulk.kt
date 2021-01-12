@@ -61,6 +61,8 @@ object JdbcToCouchDbBulk {
         val bulkSize = configs["BULKSIZE"]!!.value!!.toInt()
         val limit = configs["LIMIT"]?.value?.toInt()
         val couchprefix = args[0]
+        val couchauth = args[2]
+        val authheader = "Basic " + couchauth
         val (qopen, qclose) = configs["QUOTES"]!!.value!!.map { it }
 
         listOf(catalogg, schemaa, tablenamePattern).let { (cname, sname, tpat) ->
@@ -102,6 +104,7 @@ object JdbcToCouchDbBulk {
                                 couchConn.requestMethod = "PUT"
                                 couchConn.setRequestProperty("Content-Type", "application/json")
                                 couchConn.setRequestProperty("Accept", "application/json")
+                                couchConn.setRequestProperty("Authorization", authheader)
                                 couchConn.doOutput = true
                                 couchConn.outputStream.write("".toByteArray())
 
@@ -112,6 +115,7 @@ object JdbcToCouchDbBulk {
                                     couchConn.requestMethod = "POST"
                                     couchConn.setRequestProperty("Content-Type", "application/json")
                                     couchConn.setRequestProperty("Accept", "application/json")
+                                    couchConn.setRequestProperty("Authorization", authheader)
                                     couchConn.doOutput = true
                                     @Language("JavaScript") val viewCode = """
                                         function (doc) {
@@ -154,6 +158,7 @@ object JdbcToCouchDbBulk {
                                             URL(couchTable + "/_bulk_docs").openConnection() as HttpURLConnection
                                         couchConn.requestMethod = "POST"
                                         couchConn.setRequestProperty("Content-Type", "application/json")
+                                        couchConn.setRequestProperty("Authorization", authheader)
                                         couchConn.doInput = true
                                         couchConn.doOutput = true
                                     } catch (e: IOException) {
