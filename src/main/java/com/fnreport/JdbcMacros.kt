@@ -124,7 +124,6 @@ fun connectToJdbcUrl(jdbcUrl: String, properties: Properties? = getProperties())
     val connection = driver.connect(jdbcUrl, properties)
     err.println("driver info for '$jdbcUrl' $driver ")
     err.println("connection info: ${connection.clientInfo}")
-    err.println("properties info: ${properties}")
     val dbMeta = connection.metaData
     return Pair(connection, dbMeta)
 }
