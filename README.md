@@ -87,6 +87,14 @@ cmdline:
 com.fnreport.JdbcToCouchDbBulk http://[admin:somepassword]@0.0.0.0:5984/prefix_ jdbc:mysql://foo base64_basic_authentication_token
 ```
 
+#### Example: Writing connection to Vertica and Pulling Types ["Views"] with bin/jdbctocouchdbbulk.sh (*TO BE UPDATED PROPERLY*)
+
+```shell
+
+TYPES=[\"VIEW\"] TERSE=true /opt/como_initializer/jdbc2json/bin/jdbctocouchdbbulk.sh http://$HOST:5984/como_dw_ jdbc:vertica:VerticaHost:portNumber/databaseName?user=username&password=password $COUCHDB_BASIC_AUTH
+
+```
+
 ### sql2json.sh
 
 writes a sql query to couchdb
