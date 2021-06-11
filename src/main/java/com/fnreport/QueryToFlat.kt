@@ -10,6 +10,7 @@ import java.sql.JDBCType
 import java.sql.ResultSet
 import java.text.MessageFormat
 import java.text.SimpleDateFormat
+import java.util.*
 import java.util.Arrays.asList
 import kotlin.math.min
 
@@ -95,7 +96,7 @@ class QueryToFlat {
                         }.toTypedArray()
 
                         var accum = 0
-                        cmax = cwidths.max()!!
+                        cmax = (cwidths .maxOrNull()!! as Int)
                         val ofile = System.getenv("OUTPUT") ?: "fn"
                         System.err.println("""
                             # some sample pandas code
