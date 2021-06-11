@@ -16,7 +16,7 @@ object JdbcToCouchDbBulk {
     val configs = listOf(
         EnvConfig("FETCHSIZE", docString = "number of rows to fetch from jdbc"),
         EnvConfig("BULKSIZE", "500", docString = "number of rows to write in bulk"),
-        EnvConfig("BATCHMODE", docString = "ifnotnull"),
+//        EnvConfig("BATCHMODE", docString = "ifnotnull"),
         EnvConfig(
             "TERSE",
             "false",
