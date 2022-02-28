@@ -84,7 +84,15 @@ usage:
 env vars:
 [FETCHSIZE/* number of rows to fetch from jdbc */] [BULKSIZE:='500'/* number of rows to write in bulk */] [BATCHMODE/* ifnotnull */] [TERSE:='false'/* if not blank, this will write 1 array per record after potential record '_id' and will create a view to decorate the values as an object. */] [SCHEMAPATTERN] [CATALOG] [TABLENAMEPATTERN/* NULL is permitted, but pattern may include '%' also */] [TYPES:='["TABLE"]'/* array: Typical types are "TABLE", "VIEW", "SYSTEM TABLE", "GLOBAL TEMPORARY", "LOCAL TEMPORARY", "ALIAS", "SYNONYM" */]
 cmdline:
-com.fnreport.JdbcToCouchDbBulk http://[admin:somepassword]@0.0.0.0:5984/prefix_ jdbc:mysql://foo
+com.fnreport.JdbcToCouchDbBulk http://[admin:somepassword]@0.0.0.0:5984/prefix_ jdbc:mysql://foo base64_basic_authentication_token
+```
+
+#### Example: Writing connection to Vertica and Pulling Types ["Views"] with bin/jdbctocouchdbbulk.sh (*TO BE UPDATED PROPERLY*)
+
+```shell
+
+TYPES=[\"VIEW\"] TERSE=true /opt/como_initializer/jdbc2json/bin/jdbctocouchdbbulk.sh http://$HOST:5984/como_dw_ jdbc:vertica:VerticaHost:portNumber/databaseName?user=username&password=password $COUCHDB_BASIC_AUTH
+
 ```
 
 ### sql2json.sh
